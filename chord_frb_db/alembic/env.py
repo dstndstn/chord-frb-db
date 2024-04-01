@@ -20,11 +20,14 @@ if config.config_file_name is not None:
 # target_metadata = mymodel.Base.metadata
 target_metadata = None
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
-
+#### CHORD: plug in database password from an environment variable.
+import os
+key = 'sqlalchemy.url'
+db_url = config.get_main_option(key)
+db_pass = os.environ['CHORD_FRB_DB_PASSWORD']
+db_url = db_url.replace('PASSWORD', db_pass)
+config.set_main_option(key, db_url)
+#### /CHORD
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
