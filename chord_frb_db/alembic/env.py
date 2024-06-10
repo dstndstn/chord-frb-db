@@ -14,18 +14,22 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+#### CHORD
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+from chord_frb_db import models
+target_metadata = models.Base.metadata
+#### /CHORD
 
 #### CHORD: plug in database password from an environment variable.
 import os
 key = 'sqlalchemy.url'
 db_url = config.get_main_option(key)
-db_pass = os.environ['CHORD_FRB_DB_PASSWORD']
-db_url = db_url.replace('PASSWORD', db_pass)
+db_pass = os.environ.get('CHORD_FRB_DB_PASSWORD')
+if db_pass is not None:
+    db_url = db_url.replace('PASSWORD', db_pass)
 config.set_main_option(key, db_url)
 #### /CHORD
 
