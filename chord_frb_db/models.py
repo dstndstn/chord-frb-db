@@ -27,6 +27,7 @@ class Event(Base):
     is_new_burst:     Mapped[bool] = mapped_column(default=False, server_default='false')
     # Is a verified new FRB (subset of is_new_burst)
     is_frb:           Mapped[bool] = mapped_column(default=False)
+    is_repeating_frb:           Mapped[bool] = mapped_column(default=False, server_default='false')
 
     # CHIME/FRB's rfi_grade_level2
     # values are 0 to 10, with RFI:0 and Astrophysical:10.
@@ -96,9 +97,9 @@ class KnownSource(Base):
     __tablename__ = 'known_source'
     id:   Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64))
-    ra:   Mapped[float] = mapped_column(REAL)
-    dec:  Mapped[float] = mapped_column(REAL)
-    dm:   Mapped[float] = mapped_column(REAL)
+    ra:   Mapped[Optional[float]] = mapped_column(REAL)
+    dec:  Mapped[Optional[float]] = mapped_column(REAL)
+    dm:   Mapped[Optional[float]] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
 if __name__ == '__main__':
