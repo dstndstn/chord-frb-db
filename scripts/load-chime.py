@@ -6,22 +6,19 @@ import numpy as np
 
 from astrometry.util.fits import fits_table
 
-from sqlalchemy import create_engine, insert
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from sqlalchemy.orm import load_only
-from sqlalchemy import func
-from sqlalchemy import cast, Numeric
+from sqlalchemy import create_engine, insert, update, select, func, cast, Numeric
+from sqlalchemy.orm import Session, load_only
 
-from chord_frb_db.models import Event, EventBeam
+from chord_frb_db.models import Event, EventBeam, KnownSource
 
 def get_db_engine():
     db_url = 'postgresql+psycopg2://chordfrb:PASSWORD@localhost:5432/chordfrb'
     db_pass = os.environ.get('CHORD_FRB_DB_PASSWORD')
     if db_pass is not None:
         db_url = db_url.replace('PASSWORD', db_pass)
-    engine = create_engine(db_url,
-                           echo=True)
+    engine = create_engine(db_url)
+    # Print each SQL statement?
+    #echo=True)
     return engine
 
 def update_event_best():
@@ -50,22 +47,74 @@ def update_event_best():
 
         from collections import Counter
 
-        for n,k in Counter(list(zip(T.source_category_type, T.source_category_name))).most_common():
-            print(n, k)
+        #for n,k in Counter(list(zip(T.source_category_type, T.source_category_name))).most_common():
+        #print(n, k)
 
+        r = session.execute(select(func.count(KnownSource.id)))
+        print('Number of known sources:', r.all())
+    
         keys = ('total_snr ra dec dm dm_error spectral_index ra_error dec_error flux ' +
-                'dm_ne2001', 'dm_ymw2016 pulse_width')
-        #'source_category_name source_category_type')
+                'dm_ne2001 dm_ymw2016 pulse_width')
         keys = keys.split()
         arrs = [T.get(k) for k in keys]
         types = [float]*len(keys)
 
+        known_cache = {}
+        
         print('Updating', nbatches, 'batches of', batchsize, 'events')
         for i in range(nbatches):
             vals = []
             for j in range(i*batchsize, min(len(T), (i+1)*batchsize)):
                 d = dict([(k, t(a[j])) for k,a,t in zip(keys, arrs, types)])
-                d.update(event_id=T.event_no[j])
+                d.update(event_id=int(T.event_no[j]))
+
+                known_name = None
+
+                typ = T.source_category_type[j]
+                name = T.source_category_name[j]
+                if typ == 'RFI':
+                    d.update(is_rfi=True)
+                elif typ == 'KNOWN':
+                    if name.startswith('J') or name.startswith('B'):
+                        d.update(is_known_pulsar=True)
+                    else:
+                        # ???
+                        #print('Known / non-pulsar:', name)
+                        d.update(is_new_burst=True)
+                        if name.startswith('FRB'):
+                            d.update(is_repeating_frb=True)
+                        # else:
+                        #    -- these are integers, our own event_nos of previous bursts.
+                    known_name = name
+                elif typ == 'UNKNOWN':
+                    d.update(is_new_burst=True)
+                    if name == 'EXT':
+                        d.update(is_frb=True)
+
+                #
+                if known_name is not None:
+                    if known_name in known_cache:
+                        d.update(known_id = known_cache[known_name])
+                    else:
+                        # Look it up / add it!
+                        stmt = select(KnownSource.id).where(KnownSource.name == known_name)
+                        res = session.execute(stmt)
+                        #print('Known source lookup result:', res)
+                        r = res.first()
+                        #print('r', r)
+                        if r is not None:
+                            ksid = r[0]
+                        else:
+                            kvals = dict(name=known_name)
+                            ks = session.execute(insert(KnownSource).returning(KnownSource.id), kvals)
+                            #print('KS', ks)
+                            ks = ks.first()
+                            #print('KS', ks)
+                            ksid = ks[0]
+                            print('Added known source', known_name, '->', ksid)
+                        known_cache[known_name] = ksid
+                        d.update(known_id = ksid)
+
                 vals.append(d)
 
             session.execute(update(Event), vals)
