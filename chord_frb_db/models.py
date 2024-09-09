@@ -2,7 +2,7 @@ from sqlalchemy.orm import DeclarativeBase
 from typing import List
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Table, Column, Integer, String, SmallInteger, BigInteger, Double, REAL, ForeignKey, Float
+from sqlalchemy import Table, Column, Integer, String, SmallInteger, BigInteger, Double, REAL, ForeignKey, Float, Boolean
 
 import numpy as np
 
@@ -20,39 +20,50 @@ class Event(Base):
     event_id:  Mapped[int] = mapped_column(primary_key=True)
     # ... FRB time at infinite frequency?  What time format?  Seconds since 1970.0
     timestamp: Mapped[Optional[float]] = mapped_column(Double)
-    is_rfi:    Mapped[bool]
-    # matches a known source (Pulsar / Repeating FRB?)
-    is_known:  Mapped[bool]
-    is_frb:    Mapped[bool]
+    is_rfi:    Mapped[bool] = mapped_column(default=False)
+    # matches a known pulsar
+    is_known_pulsar:  Mapped[bool] = mapped_column(default=False, server_default='false')
+    # is a new event (FRB, incl repeats, new pulsar candidates)
+    is_new_burst:     Mapped[bool] = mapped_column(default=False, server_default='false')
+    # Is a verified new FRB (subset of is_new_burst)
+    is_frb:           Mapped[bool] = mapped_column(default=False)
+    is_repeating_frb:           Mapped[bool] = mapped_column(default=False, server_default='false')
+
+    # CHIME/FRB's rfi_grade_level2
+    # values are 0 to 10, with RFI:0 and Astrophysical:10.
+    rfi_grade: Mapped[float] = mapped_column(REAL)
+    # beam_activity: something like the number of beams that were lit up by this event = nbeams??
+    beam_activity: Mapped[int] = mapped_column(SmallInteger)
 
     # ??
     best_beam: Mapped[Optional[int]] = mapped_column(SmallInteger)
-    nbeams:    Mapped[int] = mapped_column(SmallInteger)
+    nbeams:    Mapped[int] = mapped_column(SmallInteger, default=0)
+
     beams:     Mapped[List['EventBeam']] = relationship(back_populates='event')
     best_snr:  Mapped[Optional[float]] = mapped_column(REAL)
     # multi-beam
-    total_snr: Mapped[float] = mapped_column(REAL)
+    total_snr: Mapped[Optional[float]] = mapped_column(REAL)
 
-    dm:        Mapped[float] = mapped_column(REAL)
-    dm_error:  Mapped[float] = mapped_column(REAL)
+    dm:        Mapped[Optional[float]] = mapped_column(REAL)
+    dm_error:  Mapped[Optional[float]] = mapped_column(REAL)
     # in deg
-    ra:        Mapped[float] = mapped_column(REAL)
-    ra_error:  Mapped[float] = mapped_column(REAL)
+    ra:        Mapped[Optional[float]] = mapped_column(REAL)
+    ra_error:  Mapped[Optional[float]] = mapped_column(REAL)
     # in deg
-    dec:       Mapped[float] = mapped_column(REAL)
-    dec_error: Mapped[float] = mapped_column(REAL)
+    dec:       Mapped[Optional[float]] = mapped_column(REAL)
+    dec_error: Mapped[Optional[float]] = mapped_column(REAL)
 
-    dm_ne2001:  Mapped[float] = mapped_column(REAL)
-    dm_ymw2016: Mapped[float] = mapped_column(REAL)
+    dm_ne2001:  Mapped[Optional[float]] = mapped_column(REAL)
+    dm_ymw2016: Mapped[Optional[float]] = mapped_column(REAL)
     
-    spectral_index: Mapped[float] = mapped_column(REAL)
-    scattering:     Mapped[float] = mapped_column(REAL)
+    spectral_index: Mapped[Optional[float]] = mapped_column(REAL)
+    scattering:     Mapped[Optional[float]] = mapped_column(REAL)
     # in Jy-ms
-    fluence:        Mapped[float] = mapped_column(REAL)
+    fluence:        Mapped[Optional[float]] = mapped_column(REAL)
     # in Jy
-    flux:           Mapped[float] = mapped_column(REAL)
+    flux:           Mapped[Optional[float]] = mapped_column(REAL)
     # in millisec
-    pulse_width:    Mapped[float] = mapped_column(REAL)
+    pulse_width:    Mapped[Optional[float]] = mapped_column(REAL)
 
     # Best known source match
     known_id:       Mapped[Optional[int]] = mapped_column(ForeignKey('known_source.id'))
@@ -107,9 +118,9 @@ class KnownSource(Base):
     __tablename__ = 'known_source'
     id:   Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64))
-    ra:   Mapped[float] = mapped_column(REAL)
-    dec:  Mapped[float] = mapped_column(REAL)
-    dm:   Mapped[float] = mapped_column(REAL)
+    ra:   Mapped[Optional[float]] = mapped_column(REAL)
+    dec:  Mapped[Optional[float]] = mapped_column(REAL)
+    dm:   Mapped[Optional[float]] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
 class DumbTest(Base):
