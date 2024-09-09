@@ -19,17 +19,17 @@ class Event(Base):
     __tablename__ = 'event'
     event_id:  Mapped[int] = mapped_column(primary_key=True)
     # ... FRB time at infinite frequency?  What time format?  Seconds since 1970.0
-    timestamp: Mapped[float] = mapped_column(Double)
+    timestamp: Mapped[Optional[float]] = mapped_column(Double)
     is_rfi:    Mapped[bool]
     # matches a known source (Pulsar / Repeating FRB?)
     is_known:  Mapped[bool]
     is_frb:    Mapped[bool]
 
     # ??
-    best_beam: Mapped[int] = mapped_column(SmallInteger)
+    best_beam: Mapped[Optional[int]] = mapped_column(SmallInteger)
     nbeams:    Mapped[int] = mapped_column(SmallInteger)
     beams:     Mapped[List['EventBeam']] = relationship(back_populates='event')
-    best_snr:  Mapped[float] = mapped_column(REAL)
+    best_snr:  Mapped[Optional[float]] = mapped_column(REAL)
     # multi-beam
     total_snr: Mapped[float] = mapped_column(REAL)
 
@@ -55,21 +55,41 @@ class Event(Base):
     pulse_width:    Mapped[float] = mapped_column(REAL)
 
     # Best known source match
-    known_id:       Mapped[int] = mapped_column(ForeignKey('known_source.id'))
+    known_id:       Mapped[Optional[int]] = mapped_column(ForeignKey('known_source.id'))
     known:     Mapped['KnownSource'] = relationship(back_populates='events')
 
     #def __repr__(self) -> str:
     #    return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
 
 # Individual-beam measurements for a grouped multi-beam event
+# Aka an "L1 event"
 class EventBeam(Base):
     __tablename__ = 'event_beam'
-    id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # WTF sqlite3 doesn't support big-integer primary keys?
+    #id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    id:   Mapped[int] = mapped_column(primary_key=True)
+
     beam: Mapped[int]
 
-    best_snr:  Mapped[float] = mapped_column(REAL)
+    snr:  Mapped[float] = mapped_column(REAL)
 
-    timestamp: Mapped[float] = mapped_column(Double)
+    timestamp_utc:  Mapped[float] = mapped_column(Double)
+    timestamp_fpga: Mapped[int]
+
+    time_error: Mapped[float] = mapped_column(REAL)
+    
+    tree_index: Mapped[int]
+    #spectral_index: Mapped[float] = mapped_column(REAL)
+    #scattering_measure: Mapped[float] = mapped_column(REAL)
+
+    rfi_grade: Mapped[int]
+    rfi_mask_fraction: Mapped[float] = mapped_column(REAL)
+    rfi_clip_fraction: Mapped[float] = mapped_column(REAL)
+
+    # Arrays: https://docs.sqlalchemy.org/en/20/core/type_basics.html#sqlalchemy.types.ARRAY
+    # snr_vs_dm:
+    # snr_vs_tree_index:
+    # snr_vs_spectral_index:
 
     dm:        Mapped[float] = mapped_column(REAL)
     dm_error:  Mapped[float] = mapped_column(REAL)
@@ -80,7 +100,7 @@ class EventBeam(Base):
     dec:       Mapped[float] = mapped_column(REAL)
     dec_error: Mapped[float] = mapped_column(REAL)
 
-    event_id: Mapped[int] = mapped_column(ForeignKey("event.event_id"))
+    event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
     event:     Mapped['Event'] = relationship(back_populates='beams')
 
 class KnownSource(Base):
@@ -91,6 +111,12 @@ class KnownSource(Base):
     dec:  Mapped[float] = mapped_column(REAL)
     dm:   Mapped[float] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
+
+class DumbTest(Base):
+    __tablename__ = 'dumb_test'
+    id:   Mapped[int] = mapped_column(primary_key=True)
+    #id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    x: Mapped[int]
 
 if __name__ == '__main__':
     import os
@@ -107,5 +133,14 @@ if __name__ == '__main__':
 
     Base.metadata.create_all(engine)
 
-
-
+    from sqlalchemy.orm import Session
+    with Session(engine) as session:
+        d = DumbTest(x=42)
+        session.add(d)
+        session.flush()
+        print('d id', d.id)
+    
+        e = EventBeam(dm=42)
+        session.add(e)
+        session.flush()
+        print('e id', e.id)
