@@ -85,7 +85,7 @@ class EventBeam(Base):
     snr:  Mapped[float] = mapped_column(REAL)
 
     timestamp_utc:  Mapped[float] = mapped_column(Double)
-    timestamp_fpga: Mapped[int]
+    timestamp_fpga: Mapped[int] = mapped_column(BigInteger)
 
     time_error: Mapped[float] = mapped_column(REAL)
     
