@@ -30,7 +30,12 @@ db_url = config.get_main_option(key)
 db_pass = os.environ.get('CHORD_FRB_DB_PASSWORD')
 if db_pass is not None:
     db_url = db_url.replace('PASSWORD', db_pass)
+# Alternatively, entirely replace the database URL!
+env_url = os.environ.get('CHORD_FRB_DB_URL')
+if env_url is not None:
+    db_url = env_url
 config.set_main_option(key, db_url)
+print('Using database URL', db_url)
 #### /CHORD
 
 def run_migrations_offline() -> None:
