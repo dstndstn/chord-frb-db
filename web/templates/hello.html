@@ -1,0 +1,22 @@
+<p>Hello (templated) world!</p>
+
+<p>Got {{ events|length }} events</p>
+
+<p>
+  <table>
+    <tr>
+      {% for field in fields %}
+      <th>{{field}}</th>
+      {% endfor %}
+      </tr>
+    {% for event in events %}
+    <tr>
+      {% for field in fields %}
+      <td>
+	{{ event[field] }}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</p>
