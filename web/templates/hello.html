@@ -1,9 +1,25 @@
-<p>Hello (templated) world!</p>
+<p>Hello world!</p>
 
-<p>Got {{ events|length }} events</p>
+<p>Got total number of events: {{ event_pager.total }}, Events on this page: {{ events|length }} </p>
+
+<p>Events: {{ event_pager.first }} to {{ event_pager.last }} of {{ event_pager.total }}
+</p>
+
+<p>Pages:
+  {% for page in event_pager.iter_pages() %}
+  {% if page %}
+  {% if page != event_pager.page %}
+  <a href="{{ url_for('hello', page=page) }}">{{ page }}</a>
+  {% else %}
+  <strong>{{ page }}</strong>
+  {% endif %}
+  {% else %}
+  <span class=ellipsis>…</span>
+  {% endif %}
+      {% endfor %}
 
 <p>
-  <table>
+  <table border=1>
     <tr>
       {% for field in fields %}
       <th>{{field}}</th>
@@ -13,7 +29,11 @@
     <tr>
       {% for field in fields %}
       <td>
-	{{ event[field] }}
+	{% if field in ['total_snr', 'dm', 'dm_ne2001', 'dm_ymw2016'] %}
+	  {{ event[field]|round(2) }}
+	{% else %}
+	  {{ event[field] }}
+	{% endif %}
       </td>
       {% endfor %}
     </tr>
