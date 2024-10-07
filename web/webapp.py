@@ -11,6 +11,8 @@ import sqlalchemy as sa
 
 #from flask import session
 
+print('Config:', Config)
+
 app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
