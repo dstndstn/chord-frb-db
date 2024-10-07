@@ -1,15 +1,15 @@
-<p>Hello world!</p>
+<h3>CHORD/FRB Events</h3>
 
-<p>Got total number of events: {{ event_pager.total }}, Events on this page: {{ events|length }} </p>
+<p>Total number of events: {{ event_pager.total }}</p>
 
-<p>Events: {{ event_pager.first }} to {{ event_pager.last }} of {{ event_pager.total }}
+<p>On this page: {{ event_pager.first }} to {{ event_pager.last }} of {{ event_pager.total }}
 </p>
 
 <p>Pages:
   {% for page in event_pager.iter_pages() %}
   {% if page %}
   {% if page != event_pager.page %}
-  <a href="{{ url_for('hello', page=page) }}">{{ page }}</a>
+  <a href="{{ url_for('event_list', page=page) }}">{{ page }}</a>
   {% else %}
   <strong>{{ page }}</strong>
   {% endif %}
@@ -30,7 +30,9 @@
       {% for field in fields %}
       <td>
 	{% if field in ['total_snr', 'dm', 'dm_ne2001', 'dm_ymw2016'] %}
-	  {{ event[field]|round(2) }}
+	{{ event[field]|round(2) }}
+	{% elif field == 'nbeams' %}
+	  <a href="{{ url_for('l1_event_list', event_id=event['event_id']) }}">{{ event[field] }}</a>
 	{% else %}
 	  {{ event[field] }}
 	{% endif %}

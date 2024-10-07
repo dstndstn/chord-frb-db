@@ -1,0 +1,22 @@
+<h3>CHORD/FRB per-beam events for event_id = {{ event_id }}</h3>
+
+<p> L1 events: {{ l1_events.length }}</p>
+
+<p>
+  <table border=1>
+    <tr>
+      {% for field in fields %}
+      <th>{{field}}</th>
+      {% endfor %}
+      </tr>
+    {% for event in l1_events %}
+    <tr>
+      {% for field in fields %}
+      <td>
+	{{ event[field] }}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+</p>
