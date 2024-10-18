@@ -1,4 +1,41 @@
-Prototyping a database & Python interface for the CHORD/Fast Radio Burst project
+# "Sifting" pipeline for the CHORD/Fast Radio Burst project
+
+## Context / background
+
+The CHORD FRB system is made up of the "FRB Search" stage (running on
+the FRB cluster), and the "FRB Sifting" pipeline (this code).
+
+The "FRB Search" stage receives intensity inputs from the correlator /
+X-engine and runs the "pirate" search to generate multiple
+DM-versus-time maps.  It then detects peaks and produces "events" that
+get sent to the "FRB Sifting" pipeline.
+
+Some of the names or aliases come from the CHIME world.  In CHIME, the
+correlator / X-engine is called "level 0" or L0.  The FRB search
+system is called "L1".  The part that goes from DM-versus-time maps to
+events is called "L1b".  L1b sends events to the "L2/L3" system, which
+sends events to the "L4" or database system.  Because of reasons,
+there is another database system called "frb_master" that stores a
+subset of events.
+
+In the CHIME terminology, this repository corresponds to the "L4" system.
+The "L2/L3" equivalent is in https://github.com/chord-observatory/frb-l2l3/tree/test
+
+(FIXME - rename / import into a CHORD repo!)
+
+
+
+
+
+
+
+
+
+
+
+
+
+# OLD STUFF BELOW HERE
 
 # Notes about Sqlalchemy & Alembic Setup
 
