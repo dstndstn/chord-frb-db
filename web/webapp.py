@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, make_response
 from .config import Config
 from flask import render_template
 import sys
@@ -30,7 +30,7 @@ def l1_event_list(event_id):
     return render_template('l1_event_list.html', event_id=event_id,
                            event=event, l1_events=r, fields=fields)
 
-@app.route("/")
+@app.route('/')
 def event_list(): #(name=None):
     query = sa.select(Event).order_by(Event.event_id)#.desc())
     #order_by(Event.timestamp.desc())
@@ -61,6 +61,56 @@ def event_list(): #(name=None):
     return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields)
 
 
+
+@app.route('/events.png')
+def event_plot():
+    from datetime import datetime
+
+    query = sa.select(Event).order_by(Event.event_id.desc()).limit(1000)
+    print('Query:', query)
+    r = db.session.execute(query)#.scalar()
+    print('Result:', r)
+
+    xx = []
+    yy = []
+    cc = []
+
+    for e in r:
+        (e,) = e
+        #print('  event:', e)
+        d = datetime.fromtimestamp(e.timestamp)
+        print('timestamp:', e.timestamp, '-> date', d)
+        xx.append(d)
+        #xx.append(e.timestamp)
+        #xx.append(e.event_id)
+        yy.append(e.dm)
+        cc.append(e.rfi_grade)
+
+
+    from io import BytesIO
+    from matplotlib.figure import Figure
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    
+    fig = Figure()
+    ax = fig.subplots()
+    scat = ax.scatter(xx, yy, c=cc, s=4, vmin=0, vmax=10, cmap='inferno')#copper')
+    ax.set_yscale('log')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('DM')
+    ax.set_facecolor('0.6')
+    #divider = make_axes_locatable(0)
+    #cax = divider.append_axes('right', size='5%', pad=0.05)
+    #fig.colorbar(scat, cax=cax, orientation='vertical')
+    cb = fig.colorbar(scat, cax=None, ax=ax)
+    cb.set_label('RFI grade')
+    buf = BytesIO()
+    fig.savefig(buf, format="png")
+    #buf = buf.getbuffer()
+    buf = buf.getvalue()
+
+    resp = make_response(buf)
+    resp.headers['Content-type'] = 'image/png'
+    return resp
 
 #if __name__ == '__main__':
     
