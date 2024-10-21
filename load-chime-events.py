@@ -1,8 +1,10 @@
 import sys
 import os
-from os import path
-
 import time
+import pickle
+from collections import Counter
+import numpy as np
+import fitsio
 
 from copy import deepcopy
 
@@ -20,11 +22,6 @@ from copy import deepcopy
 # from l4_pipeline.interfaces.L0_baseband.baseband_analysis import BasebandAnalysis
 # from l4_pipeline.interfaces.L0_baseband.pathfinder_callback_initiator import PathfinderCallbackInitiator
 from frb_common.events.l1_event.dtypes import L1_EVENT_DTYPE
-
-import fitsio
-import numpy as np
-import pickle
-from collections import Counter
 
 def read_fits_events(fn):
     from frb_common.events import L1Event
@@ -63,6 +60,7 @@ def get_db_engine():
 
 def create_pipeline():
     from frb_common import pipeline_tools
+
     from frb_L2_L3.actors.beam_buffer import BeamBuffer
     from frb_L2_L3.actors.beam_grouper import BeamGrouper
     from frb_L2_L3.actors.event_maker import EventMaker
@@ -97,9 +95,9 @@ def create_pipeline():
         pipeline.append((p,picl,unpickle_output))
     return pipeline
 
+
 def process_events_file(engine, pipeline, fn):
     from sqlalchemy.orm import Session
-    from chord_frb_db.models import Base
 
     #all_payloads = []
 
@@ -413,9 +411,6 @@ list of L1 events
      snr_vs_spectral_index_x [-3.0, 3.0]
 '''
 
-
-
-            
 def process_events(pipeline, e):
     # e: event tuple
     input_events = [e]
@@ -499,6 +494,115 @@ def setup():
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
     L1Event.use_bonsai_config(bonsai_config)
                 
+# Start creating a parallel version of the pipeline, porting stuff over while
+# simplifying!
+
+def simple_create_pipeline():
+    from frb_common import pipeline_tools
+
+    from chord_frb_sifter.actors.beam_buffer import BeamBuffer
+
+    pipeline = []
+    for name,clz in [('BeamBuffer', BeamBuffer),
+                     # ('BeamGrouper', BeamGrouper),
+                     # ('EventMaker', EventMaker),
+                     # ('RFISifter', RFISifter),
+                     # ('Localizer', Localizer),
+                     # ('KnownSourceSifter', KnownSourceSifter),
+                     # ('DMChecker', DMChecker),
+                     # ('FluxEstimator', FluxEstimator),
+                     # ('ActionPicker', ActionPicker),
+                     ]:
+        conf = pipeline_tools.get_worker_configuration(name)
+        conf.pop('io')
+        conf.pop('log')
+        picl = conf.pop('use_pickle')
+        conf.pop('timeout')
+        conf.pop('periodic_update')
+        p = clz(**conf)
+        pipeline.append(p)
+    return pipeline
+
+def simple_process_events(pipeline, fpga, beam, events):
+    # Here, "events" are CHIME/FRB L1 events in numpy format.
+    # For CHORD, let's assume we're instead getting
+    # lists of dictionaries
+    # (eg, maybe sent as JSON blobs)
+
+    print('events:', type(events), events)
+
+    # Event keys: dict_keys(['beam_no', 'timestamp_utc', 'timestamp_fpga',
+    # 'tree_index', 'snr', 'snr_scale', 'dm', 'spectral_index',
+    # 'scattering_measure', 'level1_nhits', 'rfi_grade_level1',
+    # 'rfi_mask_fraction', 'rfi_clip_fraction', 'snr_vs_dm',
+    # 'snr_vs_tree_index', 'snr_vs_spectral_index'])
+
+    #events: <class 'list'> [{
+    #  'beam_no': np.float64(10.0),
+    #  'timestamp_utc': np.float64(1723661291587945.0),
+    #  'timestamp_fpga': np.float64(390849057791.0),
+    #  'tree_index': np.uint8(0),
+    #  'snr': np.float32(7.524105),
+    #  'snr_scale': np.float32(0.0),
+    #  'dm': np.float32(21.431837),
+    #  'spectral_index': np.uint8(1),
+    #  'scattering_measure': np.uint8(0),
+    #  'level1_nhits': np.float64(0.0),
+    #  'rfi_grade_level1': np.uint8(9),
+    #  'rfi_mask_fraction': np.float32(0.0),
+    #  'rfi_clip_fraction': np.float32(0.0),
+    #  'snr_vs_dm': array([4.6889935, 3.897043 , 4.323593 , 4.990237 , 5.1774907, 4.9759393, 5.056928 , 7.116945 , 7.524105 ,
+    #                      6.5427437, 5.561984 , 4.7888064, 4.408268 , 5.563717 , 6.746774 , 5.896961 , 4.91972  ], dtype='>f4'),
+    #  'snr_vs_tree_index': array([7.524105, 0.      , 0.      , 0.      , 0.      ], dtype='>f4'),
+    #  'snr_vs_spectral_index': array([5.5828123, 7.524105 ], dtype='>f4')}]
+    
+    #outputs = process_events(pipeline, event_data)
+
+
+def simple_process_events_file(engine, pipeline, fn):
+    from sqlalchemy.orm import Session
+    fpgas,beams,events = simple_read_fits_events(fn)
+    u_fpgas = np.unique(fpgas)
+    for fpga in u_fpgas:
+        I = np.flatnonzero(fpgas == fpga)
+        b = beams[I]
+        ubeams = np.unique(b)
+        print(len(I), 'events for FPGA', fpga, 'in', len(ubeams), 'beams')
+        for beam in ubeams:
+            # Events for this FPGA and beam number
+            J = np.flatnonzero(b == beam)
+            K = I[J]
+            beam_events = [events[k] for k in K]
+            outputs = simple_process_events(pipeline, fpga, beam, beam_events)
+            print('Pipeline outputs:', outputs)
+            # if len(outputs):
+            #     # transaction block -- automatic commit on exit
+            #     with Session(engine) as session:
+            #         payloads = send_to_db(session, outputs)
+
+def simple_read_fits_events(fn):
+    events = fitsio.read(fn)
+    print('Events file', fn, 'contains', len(events), 'events')
+
+    beams = events['beam']
+    fpgas = events['fpga']
+    frame0nano = events['frame0_nano']
+
+    eventlist = [{} for i in range(len(events))]
+    for k in events.dtype.names:
+        if k in ['frame0_nano', 'beam', 'fpga']:
+            continue
+        for i in range(len(events)):
+            eventlist[i][k] = events[k][i]
+
+    # compute timestamp_fpga to timestamp_utc (in micro-seconds)
+    # ASSUME 2.56 microseconds per FPGA sample
+    for i in range(len(events)):
+        eventlist[i]['timestamp_utc'] = frame0nano[i]/1000. + eventlist[i]['timestamp_fpga'] * 2.56
+
+    print('Event keys:', eventlist[0].keys())
+    return fpgas,beams,eventlist
+
 if __name__ == '__main__':
     '''
     export PYTHONPATH=${PYTHONPATH}:../frb_common/:../L4_pipeline/:../L4_databases/
@@ -524,6 +628,14 @@ if __name__ == '__main__':
     setup()
     pipeline = create_pipeline()
 
-    for file_num in range(3):
+    simple_pipeline = simple_create_pipeline()
+
+    for file_num in range(10):
         fn = 'events/events-%03i.fits' % file_num
         process_events_file(engine, pipeline, fn)
+
+        print('<<< simple >>>')
+        simple_process_events_file(engine, simple_pipeline, fn)
+        print('<<< /simple >>>')
+
+

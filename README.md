@@ -54,6 +54,22 @@ elaborate framework used in CHIME/FRB.
 
 
 
+## Actors
+
+The `BeamBuffer` class used to do several things:
+* track "exposure" - which beams were reporting during each 10-second interval, written to one file per day
+* send beam status (dead/alive) to frb-master
+* send a heartbeat to frb-master
+
+
+## Open design questions
+
+* does the FRB Search system send null results to the FRB Sifter to allow tracking of dead beams / liveness / exposure?
+
+
+
+
+
 
 
 

@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 """ This module contains the class that buffers input from L1 """
 
 from os import path
