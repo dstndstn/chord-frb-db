@@ -24,6 +24,33 @@ The "L2/L3" equivalent is in https://github.com/chord-observatory/frb-l2l3/tree/
 (FIXME - rename / import into a CHORD repo!)
 
 
+## Architecture
+
+The `chord_frb_db` module provides a database interface for CHORD/FRB events.
+It uses the `sqlalchemy` package for database interactions, and the `alembic` package to
+handle changes to the data model over time.
+
+In our current testing setup, the actual database is `postsgres`.
+
+FIXME - rename
+
+The `web` directory contains a very basic web service that can read
+information from the database and display it in a web site.  It uses
+the `flask` web framework.
+
+In our current testing setup, the web service is fronted by the
+`nginx` web server.  The flask web app is run as an `uwsgi` service
+that runs via `systemd`.
+
+
+For testing purposes, we have captured a large number of events from
+the CHIME/FRB system.  These can be ingested into the database using a
+prototype of our CHORD/FRB Sifting pipeline -- which is currently
+basically just a subset of the CHIME/FRB L2/L3 system, but calling the
+core functionality directly rather than using the (perhaps overly)
+elaborate framework used in CHIME/FRB.
+
+
 
 
 
