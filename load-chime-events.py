@@ -29,10 +29,7 @@ from collections import Counter
 def read_fits_events(fn):
     from frb_common.events import L1Event
     events = fitsio.read(fn)
-    print('events:', len(events), events.dtype)
-
-    #dtype = L1_EVENT_DTYPE + [('pipeline_id', np.int64)]
-    #newevents = np.zeros(len(events), dtype)
+    print('Events file', fn, 'contains', len(events), 'events')
 
     newevents = np.zeros(len(events), L1_EVENT_DTYPE)
     for k in events.dtype.names:
@@ -49,8 +46,8 @@ def read_fits_events(fn):
     events = newevents
     events = L1Event(events)
     events = events.demote()
-    print('Final event type:', events.dtype)
-    print('Event timestamp_utc:', events['timestamp_utc'])
+    #print('Final event type:', events.dtype)
+    #print('Event timestamp_utc:', events['timestamp_utc'])
     return fpgas,beams,events
 
 def get_db_engine():
@@ -124,22 +121,12 @@ def process_events_file(engine, pipeline, fn):
             events_string = b''.join([e.tobytes() for e in beam_events])
             event_data = [str(beam).encode(), str(fpga).encode(), events_string]
             outputs = process_events(pipeline, event_data)
-            print('Outputs:', outputs)
+            print('Pipeline outputs:', outputs)
             if len(outputs):
-
-                # transaction block
-                #with engine.begin() as conn:
-                #    send_to_db(conn, outputs)
-                #    # automatic commit on exit
+                # transaction block -- automatic commit on exit
                 with Session(engine) as session:
                     payloads = send_to_db(session, outputs)
-                    #all_payloads.extend(payloads)
 
-    #f = open('payloads.pickle', 'wb')
-    #pickle.dump(all_payloads, f)
-    #f.close()
-    
-                    
 def send_to_db(session, outputs):
     from chord_frb_db.models import EventBeam, Event
 
@@ -505,7 +492,8 @@ def setup():
     import importlib.resources
     # all pipeline behaviour is encoded in config file
     configfn = 'drao_epsilon_pipeline_local.yaml'
-    with importlib.resources.path('chord_frb_sifter.config', configfn) as config_path:
+    config = importlib.resources.files('chord_frb_sifter.config').joinpath(configfn)
+    with importlib.resources.as_file(config) as config_path:
         pipeline_tools.load_configuration(config_path)
 
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
@@ -540,8 +528,6 @@ if __name__ == '__main__':
         fn = 'events/events-%03i.fits' % file_num
 
         process_events_file(engine, pipeline, fn)
-
-    main()
 
     sys.exit(0)
 
