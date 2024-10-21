@@ -1,10 +1,7 @@
 import sys
-#from tqdm import tqdm
-
 import os
 from os import path
 
-from frb_L2_L3 import config_dir
 import time
 
 from copy import deepcopy
@@ -67,28 +64,8 @@ def get_db_engine():
         Base.metadata.create_all(engine)
     return engine
 
-def mainB():
-    '''
-    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../L4_pipeline/:../L4_databases/
-    '''
-
-    # L4 pipeline
-    # import l4_pipeline.interfaces.config as cfg
-    # config_dir = os.path.dirname(os.path.realpath(cfg.__file__))
-    # print('Config_dir', config_dir)
-    # config_path = os.path.join(config_dir, "precommissioning_on_site.yaml")
-    # pipeline.load_configuration(config_path)
-    # l4_pipeline = []
-    # for name,clz in [('RegisterEvent', RegisterEvent),
-    #                  ]:
+def create_pipeline():
     from frb_common import pipeline_tools
-
-    from sqlalchemy.orm import Session
-    from chord_frb_db.models import Base
-
-    engine = get_db_engine()
-    setup()
-
     from frb_L2_L3.actors.beam_buffer import BeamBuffer
     from frb_L2_L3.actors.beam_grouper import BeamGrouper
     from frb_L2_L3.actors.event_maker import EventMaker
@@ -98,10 +75,7 @@ def mainB():
     from frb_L2_L3.actors.dm_checker import DMChecker
     from frb_L2_L3.actors.flux_estimator import FluxEstimator
     from frb_L2_L3.actors.action_picker import ActionPicker
-    #from frb_L2_L3.actors.slowpoke_catcher import SlowpokeCatcher
-    #from frb_L2_L3.actors.injection_snatcher import InjectionSnatcher
-    #from frb_L2_L3.actors.exit_handler import ExitHandler
-    
+
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
@@ -112,9 +86,6 @@ def mainB():
                      ('DMChecker', DMChecker),
                      ('FluxEstimator', FluxEstimator),
                      ('ActionPicker', ActionPicker),
-        #('InjectionSnatcher', InjectionSnatcher),
-        #('SlowpokeCatcher', SlowpokeCatcher),
-        #('ExitHandler', ExitHandler),
                      ]:
         conf = pipeline_tools.get_worker_configuration(name)
         #print('conf:', conf)
@@ -127,56 +98,52 @@ def mainB():
         picl = False
         unpickle_output = (name == 'BeamGrouper')
         pipeline.append((p,picl,unpickle_output))
+    return pipeline
 
-    all_payloads = []
+def process_events_file(engine, pipeline, fn):
+    from sqlalchemy.orm import Session
+    from chord_frb_db.models import Base
 
-    for file_num in range(3):
-        fn = 'events/events-%03i.fits' % file_num
-        fpgas,beams,events = read_fits_events(fn)
-        #fpga_start = int(events.timestamp_fpga.min())
+    #all_payloads = []
 
-        # FIXME -- could assume events files are sorted by FPGA and time....
-        u_fpgas = np.unique(fpgas)
-        for fpga in u_fpgas:
-            I = np.flatnonzero(fpgas == fpga)
-            e = events[I]
-            b = beams[I]
-            ubeams = np.unique(b)
-            print(len(I), 'events for FPGA', fpga, 'in', len(ubeams), 'beams')
-            for beam in ubeams:
-                # Events for this FPGA and beam number
-                J = np.flatnonzero(b == beam)
-                beam_events = e[J]
-                events_string = b''.join([e.tobytes() for e in beam_events])
-                event_data = [str(beam).encode(), str(fpga).encode(), events_string]
-                outputs = process_events(pipeline, event_data)
-                print('Outputs:', outputs)
-                if len(outputs):
+    fpgas,beams,events = read_fits_events(fn)
+    #fpga_start = int(events.timestamp_fpga.min())
 
-                    # transaction block
-                    #with engine.begin() as conn:
-                    #    send_to_db(conn, outputs)
-                    #    # automatic commit on exit
-                    with Session(engine) as session:
-                        payloads = send_to_db(session, outputs)
+    # FIXME -- could assume events files are sorted by FPGA and time....
+    u_fpgas = np.unique(fpgas)
+    for fpga in u_fpgas:
+        I = np.flatnonzero(fpgas == fpga)
+        e = events[I]
+        b = beams[I]
+        ubeams = np.unique(b)
+        print(len(I), 'events for FPGA', fpga, 'in', len(ubeams), 'beams')
+        for beam in ubeams:
+            # Events for this FPGA and beam number
+            J = np.flatnonzero(b == beam)
+            beam_events = e[J]
+            events_string = b''.join([e.tobytes() for e in beam_events])
+            event_data = [str(beam).encode(), str(fpga).encode(), events_string]
+            outputs = process_events(pipeline, event_data)
+            print('Outputs:', outputs)
+            if len(outputs):
 
-                    all_payloads.extend(payloads)
+                # transaction block
+                #with engine.begin() as conn:
+                #    send_to_db(conn, outputs)
+                #    # automatic commit on exit
+                with Session(engine) as session:
+                    payloads = send_to_db(session, outputs)
+                    #all_payloads.extend(payloads)
 
-    f = open('payloads.pickle', 'wb')
-    pickle.dump(all_payloads, f)
-    f.close()
+    #f = open('payloads.pickle', 'wb')
+    #pickle.dump(all_payloads, f)
+    #f.close()
     
                     
 def send_to_db(session, outputs):
-    # outputs are like [[<frb_common.events.l2_event.l2_event.L2Event object at 0x123fc4190>],
-
     from chord_frb_db.models import EventBeam, Event
 
-    # Not setting in DB:
-    #
-
     # Not using from pipeline:
-    # timestamp_utc (it's wrong?)
     # snr_scale (what is it)
     # spectral_index
     # scattering_measure
@@ -244,7 +211,6 @@ def send_to_db(session, outputs):
         'rfi_grade_level2': 'rfi_grade',
         'beam_activity': True,
     }
-    #'flux_mjy': 'flux',
 
     payloads = []
 
@@ -261,7 +227,6 @@ def send_to_db(session, outputs):
                            'scattering': 0.,
                            'fluence': 0.,
                            }
-            #l1_event_ids = []
             l1_objs = []
 
             payload = event.database_payload()
@@ -535,151 +500,28 @@ def process_events(pipeline, e):
     return outputs
     
 def setup():
-    from frb_common import pipeline_tools as pipeline
-    # all pipeline behaviour is encoded in config file
-    config_path = path.join(config_dir, "drao_epsilon_pipeline_local.yaml")
-    pipeline.load_configuration(config_path)
-    setup_L1_event()
-    
-def setup_L1_event():
-    from frb_common import pipeline_tools as pipeline
+    from frb_common import pipeline_tools
     from frb_common.events import L1Event
-    bonsai_config = pipeline.config["generics"]["bonsai_config"]
+    import importlib.resources
+    # all pipeline behaviour is encoded in config file
+    configfn = 'drao_epsilon_pipeline_local.yaml'
+    with importlib.resources.path('chord_frb_sifter.config', configfn) as config_path:
+        pipeline_tools.load_configuration(config_path)
+
+    bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
     L1Event.use_bonsai_config(bonsai_config)
-
-def mainA():
-    from frb_L2_L3.utils import L1Simulator
-    from frb_L2_L3 import sample_events_dir
-    events = np.load(path.join(sample_events_dir, "stress_sample.npy"))
-    print('Loaded events:', events)
-    print('Number of events:', len(events))
-    events = events[:4000]
-    print('Number of events:', len(events))
-
-    setup()
-
-    # upgrade events...
-    print('Saved event dtype', events.dtype)
-    newevents = np.zeros(len(events), L1_EVENT_DTYPE)
-    for k in events.dtype.names:
-        newevents[k] = events[k]
-    events = newevents
-    print('Saved event dtype 2', events.dtype)
-    events = L1Event(events)
-    events = events.demote()
-
-    pl = []
-    for name,clz in [('BeamBuffer', BeamBuffer),
-                     ('BeamGrouper', BeamGrouper),
-                     ('EventMaker', EventMaker),
-                     ('RFISifter', RFISifter),
-                     ('Localizer', Localizer),
-                     ('KnownSourceSifter', KnownSourceSifter),
-                     ('DMChecker', DMChecker),
-                     ('FluxEstimator', FluxEstimator),
-                     ('ActionPicker', ActionPicker),
-                     ('InjectionSnatcher', InjectionSnatcher),
-                     ('SlowpokeCatcher', SlowpokeCatcher),
-                     ('ExitHandler', ExitHandler),
-                     ]:
-        conf = pipeline.get_worker_configuration(name)
-        print('conf:', conf)
-        conf.pop('io')
-        conf.pop('log')
-        picl = conf.pop('use_pickle')
-        conf.pop('timeout')
-        conf.pop('periodic_update')
-        p = clz(**conf)
-
-        picl = False
-        unpickle_output = (name == 'BeamGrouper')
-
-        pl.append((p,picl,unpickle_output))
-
-    tchunk = 8.0
-    speedup = 80.
-    tsleep = tchunk / speedup
-
-    t_keys = events.timestamp_utc.astype(int) // int(1e6 * tchunk)
-    b_keys = events.beam_no
-    lookup = {}
-    # for tk, bk, v in zip(t_keys, b_keys, [e.tostring() for e in events]):
-    #     lookup.setdefault(tk, {})
-    #     lookup[tk][bk] = lookup[tk].get(bk, b"") + v
-    for tk, bk, v in zip(t_keys, b_keys, events):
-        lookup.setdefault(tk, {})
-        lookup[tk].setdefault(bk, [])
-        lookup[tk][bk].append(v)
-    fpga_start = int(events.timestamp_fpga.min())
-
-    it0 = min(lookup.keys())
-
-    beam_ids = 1000 * (np.arange(1024) // 256) + np.arange(1024) % 256
-
-    sleep_deficit = 0.
-
-    total_treal = 0.
-    total_tspent = 0.
-
-    pipeline_output = []
-    
-    #for it in tqdm(sorted(lookup.keys())):
-    for it in sorted(lookup.keys()):
-        t0 = time.time()
-
-        fpga_stamp = fpga_start + int(it - it0) * int(tchunk / 2.56e-6)
-        time_set = lookup.get(it, {})
-
-        #for e in events:
-        #e = e.tostring()
-        #print('Event (stringified):', e)
-        print('Running event', it)
-
-        for beam in beam_ids:
-
-            tnow = time.monotonic()
-            events = time_set.get(beam, [])
-            for e in events:
-                e['l1_timestamp'] = tnow
-            events_string = b"".join([e.tostring() for e in events])
-
-            e = [str(beam).encode(), str(fpga_stamp).encode(), events_string]
-            #print('Running event key', it, 'beam', beam)
-
-            outputs = process_events(pl, e)
-            pipeline_output.extend(outputs)
-        # end of beams
-                
-        dt = time.time() - t0
-
-        total_tspent += dt
-        total_treal += tchunk
-        print('Running on average at %.1f x speed' % (total_treal / total_tspent))
-        
-        print('Ran this event at %.1f x speed' % (tchunk / dt))
-        print('Sleeping', tsleep-dt, '; sleep deficit', sleep_deficit)
-        sleep = tsleep - dt
-        if sleep > 0 and sleep_deficit > 0:
-            # We ran faster than expected; pay back "sleep deficit" if we have any.
-            payback = min(sleep, sleep_deficit)
-            sleep -= payback
-            sleep_deficit -= payback
-        if sleep < 0:
-            sleep_deficit += -sleep
-        else:
-            time.sleep(sleep)
-
-    open('simple-output.picl', 'wb').write(pickle.dumps(pipeline_output))
                 
 if __name__ == '__main__':
+    '''
+    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../L4_pipeline/:../L4_databases/
+    '''
+
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from chord_frb_db.models import Base, EventBeam, Event
     from sqlalchemy import delete
 
     engine = get_db_engine()
-
-    #mainA()
 
     # Drop all existing data!!!
 
@@ -690,16 +532,24 @@ if __name__ == '__main__':
         st = delete(Event)
         session.execute(st)
         session.commit()
-    
-    mainB()
-    #sys.exit(0)
+
+    setup()
+    pipeline = create_pipeline()
+
+    for file_num in range(3):
+        fn = 'events/events-%03i.fits' % file_num
+
+        process_events_file(engine, pipeline, fn)
+
+    main()
+
+    sys.exit(0)
 
     class EventDuck(object):
         def __init__(self, payload):
             self.payload = payload
         def database_payload(self):
             return self.payload
-
     payloads = pickle.load(open('payloads.pickle','rb'))
     outputs = []
     for p in payloads:
