@@ -526,36 +526,4 @@ if __name__ == '__main__':
 
     for file_num in range(3):
         fn = 'events/events-%03i.fits' % file_num
-
         process_events_file(engine, pipeline, fn)
-
-    sys.exit(0)
-
-    class EventDuck(object):
-        def __init__(self, payload):
-            self.payload = payload
-        def database_payload(self):
-            return self.payload
-    payloads = pickle.load(open('payloads.pickle','rb'))
-    outputs = []
-    for p in payloads:
-        o2 = []
-        outputs.append(o2)
-        for payload in p:
-            del payload['version']
-            o2.append(EventDuck(payload))
-
-    #from sqlalchemy.orm import sessionmaker
-    #Session = sessionmaker(engine)
-    #with Session() as session:
-
-    with Session(engine) as session:
-        try:
-            send_to_db(session, outputs)
-        except:
-            print('Exception in send_to_db:')
-            import traceback
-            traceback.print_exc()
-            sys.exit(0)
-        print('Committing session...')
-        session.commit()
