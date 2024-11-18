@@ -1,4 +1,5 @@
 [Unit]
+# Copy this file to /etc/systemd/system/uwsgi-chordfrb.service
 Description=CHORD/FRB uWSGI service
 # Requirements
 Requires=network.target
@@ -14,8 +15,8 @@ Type=forking
 NotifyAccess=all
 WorkingDirectory=/home/dstn/chord/chord-frb-db
 User=dstn
-#Environment="PYTHONPATH=/home/nova" "PATH=/usr/local/bin:/usr/bin:/bin:/home/nova/astrometry/util:/home/nova/astrometry/solver:/home/nova/astrometry/plot"
-ExecStart=/home/dstn/chord/chord-frb-db/web/uwsgi.sh
+#Environment="PYTHONPATH=/home/nova" "PATH=/usr/local/bin:"
+ExecStart=/home/dstn/chord/chord-frb-db/chord_frb_web/uwsgi.sh
 
 [Install]
 WantedBy=multi-user.target
