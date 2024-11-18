@@ -55,8 +55,12 @@ elaborate framework used in CHIME/FRB.
 
 * load-chime-events.py
 
-This script reads saved CHIME/FRB events and loads them into our CHORD/FRB database.
+This script reads saved CHIME/FRB events, sends them through a pipeline of 'actors', and loads the results into our CHORD/FRB database.
 
+## Simplification
+
+As part of the CHORD/FRB effort, we want to simplify everything.  In this spirit, I have started copying actors from the old L2/L3 repo into
+the `chord_frb_sifter` directory.  So far, have only done the `BeamBuffer`!
 
 
 ## Actors
@@ -65,16 +69,13 @@ The `BeamBuffer` class used to do several things:
 * track "exposure" - which beams were reporting during each 10-second interval, written to one file per day
 * send beam status (dead/alive) to frb-master
 * send a heartbeat to frb-master
-
+Now, it just buffers events from a single chunk of data, waiting for data from all beams to arrive; when the next chunk of data arrives, it flushes
+the buffer.
 
 ## Open design questions
 
-* does the FRB Search system send null results to the FRB Sifter to allow tracking of dead beams / liveness / exposure?
-
-
-
-
-
+* how do we want to track liveness / effective exposure time?
+* does the FRB Search system send null results to the FRB Sifter if no event is found?
 
 
 
