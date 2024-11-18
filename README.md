@@ -51,6 +51,11 @@ core functionality directly rather than using the (perhaps overly)
 elaborate framework used in CHIME/FRB.
 
 
+## Scripts
+
+* load-chime-events.py
+
+This script reads saved CHIME/FRB events and loads them into our CHORD/FRB database.
 
 
 
@@ -65,6 +70,7 @@ The `BeamBuffer` class used to do several things:
 ## Open design questions
 
 * does the FRB Search system send null results to the FRB Sifter to allow tracking of dead beams / liveness / exposure?
+
 
 
 

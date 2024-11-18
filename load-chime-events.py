@@ -523,14 +523,27 @@ def simple_create_pipeline():
         pipeline.append(p)
     return pipeline
 
-def simple_process_events(pipeline, fpga, beam, events):
-    # Here, "events" are CHIME/FRB L1 events in numpy format.
-    # For CHORD, let's assume we're instead getting
-    # lists of dictionaries
-    # (eg, maybe sent as JSON blobs)
+#def simple_process_events(pipeline, fpga, beam, events):
+def simple_process_events(pipeline, events):
+    #print('events:', type(events), events)
 
-    print('events:', type(events), events)
+    input_events = [events]
+    output_events = []
+    for actor in pipeline:
+        output_events = []
+        for in_item in input_events:
+            items = actor.perform_action(in_item)
+            if items is None:
+                continue
+            for item in items:
+                if item is None:
+                    continue
+                output_events.append(item)
+        if len(output_events) == 0:
+            break
+        input_events = output_events
 
+    return output_events
     # Event keys: dict_keys(['beam_no', 'timestamp_utc', 'timestamp_fpga',
     # 'tree_index', 'snr', 'snr_scale', 'dm', 'spectral_index',
     # 'scattering_measure', 'level1_nhits', 'rfi_grade_level1',
@@ -551,9 +564,12 @@ def simple_process_events(pipeline, fpga, beam, events):
     #  'rfi_grade_level1': np.uint8(9),
     #  'rfi_mask_fraction': np.float32(0.0),
     #  'rfi_clip_fraction': np.float32(0.0),
-    #  'snr_vs_dm': array([4.6889935, 3.897043 , 4.323593 , 4.990237 , 5.1774907, 4.9759393, 5.056928 , 7.116945 , 7.524105 ,
-    #                      6.5427437, 5.561984 , 4.7888064, 4.408268 , 5.563717 , 6.746774 , 5.896961 , 4.91972  ], dtype='>f4'),
-    #  'snr_vs_tree_index': array([7.524105, 0.      , 0.      , 0.      , 0.      ], dtype='>f4'),
+    #  'snr_vs_dm': array([4.6889935, 3.897043 , 4.323593 , 4.990237 ,
+    #              5.1774907, 4.9759393, 5.056928 , 7.116945 , 7.524105 ,
+    #              6.5427437, 5.561984 , 4.7888064, 4.408268 , 5.563717 ,
+    #              6.746774 , 5.896961 , 4.91972  ], dtype='>f4'),
+    #  'snr_vs_tree_index': array([7.524105, 0.      , 0.      ,
+    #                              0.      , 0.      ], dtype='>f4'),
     #  'snr_vs_spectral_index': array([5.5828123, 7.524105 ], dtype='>f4')}]
     
     #outputs = process_events(pipeline, event_data)
@@ -573,8 +589,16 @@ def simple_process_events_file(engine, pipeline, fn):
             J = np.flatnonzero(b == beam)
             K = I[J]
             beam_events = [events[k] for k in K]
-            outputs = simple_process_events(pipeline, fpga, beam, beam_events)
-            print('Pipeline outputs:', outputs)
+            for e in beam_events:
+                e['fpga_chunk'] = fpga
+                # the events already have a "beam_no" field ... weirdly in float format
+                e['beam_no'] = int(e['beam_no'])
+            outputs = simple_process_events(pipeline, beam_events)
+            #outputs = simple_process_events(pipeline, fpga, beam, beam_events)
+            if outputs is None:
+                print('Pipeline outputs:', outputs)
+            else:
+                print('Pipeline outputs:', len(outputs))
             # if len(outputs):
             #     # transaction block -- automatic commit on exit
             #     with Session(engine) as session:
@@ -605,7 +629,7 @@ def simple_read_fits_events(fn):
 
 if __name__ == '__main__':
     '''
-    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../L4_pipeline/:../L4_databases/
+    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/:../L4_pipeline/:../L4_databases/
     '''
 
     from sqlalchemy import create_engine
