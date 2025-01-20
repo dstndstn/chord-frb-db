@@ -121,6 +121,8 @@ class KnownSource(Base):
     ra:   Mapped[Optional[float]] = mapped_column(REAL)
     dec:  Mapped[Optional[float]] = mapped_column(REAL)
     dm:   Mapped[Optional[float]] = mapped_column(REAL)
+    is_frb:          Mapped[bool] = mapped_column(default=False)
+    is_pulsar:       Mapped[bool] = mapped_column(default=False)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
 class DumbTest(Base):

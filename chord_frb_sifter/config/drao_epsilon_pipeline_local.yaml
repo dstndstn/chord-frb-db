@@ -1,0 +1,265 @@
+---
+version: '0.6-epsilon.01-08-18'
+
+# The following dictionary gives default values for parameters that are
+# relevant to all actors, either through their superclass (``ActorBaseClass``),
+# or through the ``WorkerProcess`` wrapper (which handles the networking and
+# multiprocessing aspects of the pipeline). The `specifics` dictionary below
+# can be used to overload these defaults to suit the actor's needs. The `io`
+# parameter **must** be overloaded by every actor.
+generics:
+    # frb_common.ActorBaseClass
+    #bonsai_config: 'bonsai_production_ups_nbeta1_v2.txt'
+    #bonsai_config: 'bonsai_production_noups_nbeta2_5tree_experiment.txt'
+    bonsai_config: 'bonsai_production_fixed_coarse_graining_hybrid_0.8_0.015.txt'
+    pipeline_mode: 'SCIENCE'  # str in ['DEBUG', 'SCIENCE', 'PASS_THROUGH']
+    log_level: 'MNC'      # str in ['DEBUG', 'INFO', 'MNC', 'WARNING',
+                          #         'ERROR', 'CRITICAL', 'BYPASS']
+
+    #Other Configurations
+    #########
+    worker_id: 0            # int >= 0; used to identify actor clones
+    logger: null            # from code, should be a logging.Logger instance
+                            # from config, should be null to allow a new logger
+                            # to be instantited based on the other parameters.
+                            # See frb_common.logger_lib.get_logger().
+
+    # frb_common.Worker
+    io: null                # Must be overloaded. See class docstring for
+                            # formatting details.
+    log: null #'tcp://10.6.213.18:9003'  # str; zmq address to publish logs to
+    use_pickle: true        # bool; do automatic (un)serialization before/after
+                            #       ``actor.perform_action()`` calls.
+    timeout: 0.0            # float; seconds to allow perform_action() to
+                            #        return before triggering alternate action.
+                            #        0.0 -> no timeout applied.
+    periodic_update: 0.0    # float; hours between calls to ``actor.update()``
+                            #        0.0 -> don't try to perform updates
+    incoherent_beam_ids: [0, 1000, 2000, 3000]
+
+
+# The following dictionary is used to configure each actor, as well as the
+# ``WorkerProcess`` it will be wrapped in. Parameters that appear in the
+# `generics` dictionary will be overridden by values here (e.g. the
+# `use_pickle` param for the ``BeamBuffer``). Every actor **must** specify an
+# `io`.  Do ``help(frb_L2_L3.ActorName)`` for extended explanations of the
+# non-generic parameters.
+specifics:
+    BeamBuffer:
+
+        #beam_status_url: "http://frb-vsop.chime:8001/v1/metrics"
+        io: ['+ipc://L2L3Entrance', '*ipc://BeamBuffer']
+        periodic_update: 0.1  # For exposure dumping
+        use_pickle: false   # BeamBuffer has non-standard input & output.
+
+    BeamGrouper:
+        # Grouping thresholds. Note: DEC. and R.A. thresholds are given in
+        # units of beam separation, so thresholds of 1.1 will allow beams to be
+        # grouped with the 8 (or 5) surrounding beams.
+        dec_thr: 2.1        # float; (see above note)
+        ra_thr: 3.1         # float; (see above note)
+        t_thr: 64.          # float; time threshold in ms
+        dm_thr: 3.5         # float; DM threshold in pc cm^-3
+
+        io: ['+ipc://BeamBuffer', '+ipc://BeamGrouper_a']
+        use_pickle: false   # BeamGrouper takes non-standard input
+        periodic_update: 0.0167    # float; hours between calls to ``actor.update()``
+
+    EventMaker:
+        io: ['+ipc://BeamGrouper_b', '+ipc://EventMaker_a']
+        #io: ['+ipc://BeamGrouper_b', '*ipc://EventMaker_b']
+
+    RFISifter:
+        threshold: 5.0            # float; threshold above which an event is deemed
+                                  #        to be astrophysical. Range (0,10)
+        filters:                  # list; definitions of filters to be used, format
+                                  #       is 'filter_name', dict
+                                  #       with kwargs.
+            - ['ML_Classifier_Ensemble', {clf_filename: "/data/rfi_sifter/XGBoost_model.pkl", labels_filename: "/data/rfi_sifter/XGBoost_model.yaml", clf_scaler: "/data/rfi_sifter/scaler.pkl", svm_filename: "/data/rfi_sifter/20190322_python3.pkl", svm_labels_filename: "/data/rfi_sifter/20190322.pkl_labels.yaml"}]
+            - ['High_SNR_Override', {snr_threshold: 100.0, only_coherent: true}]
+        io: ['+ipc://EventMaker_b', '+ipc://RFISifter_a']
+
+
+    Localizer:
+        test_nchan: 64              # int; number of channels to use for fits
+        test_band: [400.0, 800.0]   # [float, float]; bottom&top of band in MHz
+        snr_threshold: 7.5          # float; S/N threshold for a detection,
+                                    # i.e. the L1 detection threshold
+        del_chisq_threshold: 400.   # float; Delta chi-squared threshold for
+                                    # localization uncertainty regions.
+        mode: 1                     # 0: 1024 beams, 1: columns on meridian
+        io: ['+ipc://RFISifter_b', '+ipc://Localizer_a']
+
+
+    KnownSourceSifter:
+        threshold: 0.68          # float; threshold above which an event is
+                                 #        deemed to have a known source
+                                 #        association
+        sky_region: 5.0          # float; angular separation or RA window to
+                                 #        get candidate sources from, in
+                                 #        degrees
+        dm_region: 5.0           # float; DM span to get candidate sources
+                                 #        from, factor to multiply the event's
+                                 #        DM error with
+        filters:                 # list of lists; each list configures a
+                                 #        filter and has format
+                                 #        [filter name, filter weight]
+            - ['compare_position', 1.0]
+            - ['compare_dm', 1.0]
+        io: ['+ipc://Localizer_b', '+ipc://KnownSourceSifter_a']
+        periodic_update: 1.0    # reload known sources database every hour
+
+
+    DMChecker:
+        systematic_uncertainty_limit: 0.    # lower limit in DM systematic uncertainty.
+        ambiguous_threshold: -1.0           # float; significance threshold for ambiguous class.
+        frb_threshold: 0.                   # float; significance threshold for FRB class.
+        use_measured_uncertainty : False    # bool; do we want to use measured uncertainty 
+                                            #       when determining source classification?
+        io: ['+ipc://KnownSourceSifter_b', '+ipc://DMChecker_a']
+
+
+    FluxEstimator:
+        tsamp_ms: 0.98304         # float; sampling time [ms]
+        npol: 2                # int; number of polarizations
+        gain: 1.38             # float; gain [K/Jy]
+        freq_mhz: 600.0            # float; center frequency of survey [MHz]
+        bandwidth_mhz: 400.0       # float; bandwidth of survey [MHz]
+        nchan: 16384           # int; number of frequency channels
+        tsys: 50.0             # float; system temperature [K]
+        beta: 0.9              # float; digitization loss factor
+        map_freq_mhz: 408.0        # float; frequency of the tsky map [MHz]
+        sky_index: -2.6        # float; spectral index of sky tempature
+        io: ['+ipc://DMChecker_b', '+ipc://FluxEstimator_a']
+
+    ActionPicker:
+        rfi_intensity_callback:         # list of lists
+            fraction: 0.0               # float; callback fraction [0.0-1.0]
+            snr_threshold: 10.0         # float; SNR threshold above which to do a callback
+            format: 'GET_BLOCK'         # str; 'GET_BLOCK' or 'GET_STRIP'
+            width_factor: 50            # int; *= pulse width gets called back
+            spectral_resolution: 16384  # int; number of frequency channels
+            priority: 'LOW'             # str; 'LOW', 'MEDIUM' or 'HIGH'
+        periodic_update: 1.0           # reload the action rules every hour
+        io: ['+ipc://FluxEstimator_b', '+ipc://ActionPicker_a']
+
+    InjectionSnatcher:
+        threshold: 0.5                    # float; threshold for matching the event with the injection
+        time_threshold: 0.5               # float; time separation threshold in seconds
+        dm_threshold: 1.0                 # float; dm separation threshold in pc/cc
+        base_url: 'http://frb-vsop.chime:8001'  # str; URL where frb-master resides
+        payload_drop_attr:                # list; List of L2 event attributes dropped from the payload
+            - 'known_source_metrics' 
+            - 'actions'
+            - 'pipeline_mode'     
+        io: ['+ipc://ActionPicker_b', '+ipc://InjectionSnatcher_a']
+        periodic_update: 0.0167              # Reload database every 1 min
+
+    SlowpokeCatcher:
+        thresholds:         # dict; configures multiple saving behaviours
+            sigma: null     # float; number of sigma above which an event
+                            #        should be saved, based on running
+                            #        estimation of latency variance
+            gate: 0.001     # float; seconds of latency above which an event
+                            #        should be saved
+            nlongest: null  # int; number of the largest latency events to save
+        aggregate_l1: true  # bool; save all L1 headers as a single numpy arrays
+
+        #io: ['+ipc://RFISifter_b', '+ipc://SlowpokeCatcher_a']
+        io: ['+ipc://InjectionSnatcher_b', '+ipc://SlowpokeCatcher_a']
+        periodic_update: 1.0
+
+    ExitHandler:
+        log_level: "DEBUG"  # for injection debugging
+        is_test: False
+        io: ['+ipc://SlowpokeCatcher_b', '+ipc://L2L3Exit']
+
+    MetricCollector:
+        log_addr: 'tcp://*:19013'  # str; force listening on all interfaces
+        metrics_port: 8080
+
+# The following dictionary configures networking devices used to interface
+# L2/L3 with L1 and L4. See ``frb_common.pipeline_tools.add_device()``.
+networking_devices:
+    forwarder:
+        in_addr: '*tcp://*:19001'
+        in_type: 'SUB'
+        out_addr: '*tcp://*:20010'
+        out_type: 'PUB'
+    entrance:
+        # Note: `{in|out}_addr` should be regular zmq address strings,
+        # prepended by '+' or '*', specifying whether the socket should connect
+        # or bind, respectively.
+        #in_addr: '*tcp://10.6.213.18:9001'     # str; (see above note)
+        in_addr: '+tcp://localhost:20010'     # str; (see above note)
+        in_type: 'SUB'               # str in ['SUB', 'PULL'], zmq.Socket type
+        out_addr: '*ipc://L2L3Entrance'   # str; (see above note)
+        out_type: 'PUSH'             # str in ['PUB', 'PUSH'], zmq.Socket type
+
+    exit:
+        in_addr: '*ipc://L2L3Exit'
+        in_type: 'PULL'
+        out_addr: '*tcp://*:19002'
+        out_type: 'PUB'
+
+    BeamGrouper2EventMaker:
+        in_addr: '*ipc://BeamGrouper_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://BeamGrouper_b'
+        out_type: 'PUSH'
+
+    EventMaker2RFISifter:
+        in_addr: '*ipc://EventMaker_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://EventMaker_b'
+        out_type: 'PUSH'
+
+    RFISifter2Localizer:
+        in_addr: '*ipc://RFISifter_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://RFISifter_b'
+        out_type: 'PUSH'
+
+    Localizer2KnownSourceSifter:
+        in_addr: '*ipc://Localizer_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://Localizer_b'
+        out_type: 'PUSH'
+
+    KnownSourceSifter2DMChecker:
+        in_addr: '*ipc://KnownSourceSifter_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://KnownSourceSifter_b'
+        out_type: 'PUSH'
+
+    DMChecker2FluxEstimator:
+        in_addr: '*ipc://DMChecker_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://DMChecker_b'
+        out_type: 'PUSH'
+
+    FluxEstimator2ActionPicker:
+        in_addr: '*ipc://FluxEstimator_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://FluxEstimator_b'
+        out_type: 'PUSH'
+
+    ActionPicker2InjectionSnatcher:
+        in_addr: '*ipc://ActionPicker_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://ActionPicker_b'
+        out_type: 'PUSH'
+
+    InjectionSnatcher2SlowpokeCatcher:
+        in_addr: '*ipc://InjectionSnatcher_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://InjectionSnatcher_b'
+        out_type: 'PUSH'
+
+    SlowpokeCatcher2ExitHandler:
+        in_addr: '*ipc://SlowpokeCatcher_a'
+        in_type: 'PULL'
+        out_addr: '*ipc://SlowpokeCatcher_b'
+        out_type: 'PUSH'
+
+...

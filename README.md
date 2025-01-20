@@ -30,7 +30,7 @@ The `chord_frb_db` module provides a database interface for CHORD/FRB events.
 It uses the `sqlalchemy` package for database interactions, and the `alembic` package to
 handle changes to the data model over time.
 
-In our current testing setup, the actual database is `postsgres`.
+In our current testing setup, the actual database is `postgres`.
 
 FIXME - rename
 

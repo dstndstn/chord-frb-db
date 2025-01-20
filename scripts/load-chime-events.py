@@ -52,7 +52,8 @@ def get_db_engine():
     from chord_frb_db.models import Base
     db_url = os.environ.get('CHORD_FRB_DB_URL', 'sqlite+pysqlite:///db.sqlite3')
     print('Using database URL:', db_url)
-    engine = create_engine(db_url, echo=True)
+    #engine = create_engine(db_url, echo=True)
+    engine = create_engine(db_url, echo=False)
     if 'sqlite' in db_url:
         # Make sure database tables exist
         Base.metadata.create_all(engine)
@@ -223,18 +224,14 @@ def send_to_db(session, outputs):
                 if k in ['dead_beam_nos']:
                     continue
                 if k == 'l1_events':
-                    print(' ', k, ':', len(v))
+                    #print(' ', k, ':', len(v))
                     for l1 in v:
-
                         l1_db_args = {}
-
-                        print('  L1 Event:')
+                        #print('  L1 Event:')
                         for l1k,l1v in l1.items():
-                            print('    ', l1k, l1v)
-
+                            #print('    ', l1k, l1v)
                             if l1k == 'timestamp_utc':
                                 l1v = l1v.timestamp()
-
                             k2 = l1_name_map.get(l1k, None)
                             if k2 is not None:
                                 # same key name
@@ -245,10 +242,10 @@ def send_to_db(session, outputs):
                         #for k,v in l1_db_args.items():
                         #    print('  L1:', k, '=', type(v), v)
                         l1_db_obj = EventBeam(**l1_db_args)
-                        print('Created L1 db object:', l1_db_obj)
+                        #print('Created L1 db object:', l1_db_obj)
                         session.add(l1_db_obj)
                         session.flush()
-                        print('L1 db id:', l1_db_obj.id)
+                        #print('L1 db id:', l1_db_obj.id)
                         assert(l1_db_obj.id is not None)
                         #l1_event_ids.append(l1_db_obj.id)
                         l1_objs.append(l1_db_obj)
@@ -256,7 +253,7 @@ def send_to_db(session, outputs):
                     continue
                 if isinstance(v, (np.float32, np.float64)):
                     v = float(v)
-                print(' ', k, v)
+                #print(' ', k, v)
 
                 if k == 'timestamp_utc':
                     v = v.timestamp()
@@ -266,8 +263,20 @@ def send_to_db(session, outputs):
                     if k2 is True:
                         k2 = k
                     l2_db_args[k2] = v
+                else:
+                    print('Ignoring L2 key:', k, '=', v)
+
                 if k == 'known_source_name':
-                    print('Known source!')
+                    if v != "":
+                        print('Known source!')
+                        print('val: "%s"' % v)
+
+                        # Find the known source by name
+                        
+
+                        #Ignoring L2 key: known_source_rating = 0.9988938570022583
+                        #Ignoring L2 key: known_source_metrics = {'position_weight': 1.0, 'position_bayes_factor_J0824+00': 7.4928274, 'dm_weight': 1.0, 'dm_bayes_factor_J0824+00': 120.52226426229063}
+                        
                 if k == 'event_category':
                     if v == 3:
                         l2_db_args['is_rfi'] = True
@@ -278,23 +287,23 @@ def send_to_db(session, outputs):
             #l2_db_args['nbeams'] = len(l1_event_ids)
             l2_db_args['nbeams'] = len(l1_objs)
 
-            for k,v in l2_db_args.items():
-                print(' L2:', k, '=', type(v), v)
+            #for k,v in l2_db_args.items():
+            #    print(' L2:', k, '=', type(v), v)
 
             l2_db_obj = Event(**l2_db_args)
-            print('Created L2 db object:', l2_db_obj)
+            #print('Created L2 db object:', l2_db_obj)
             session.add(l2_db_obj)
             #print('L1 event ids:', l1_event_ids)
-            print('L2 beams:', l2_db_obj.beams)
+            #print('L2 beams:', l2_db_obj.beams)
             #for b in l1_event_ids:
             #    l2_db_obj.beams.append(b)
             for e in l1_objs:
                 l2_db_obj.beams.append(e)
             session.flush()
-            print('L2 db id:', l2_db_obj.event_id)
-            print('L2 beam ids:', l2_db_obj.beams)
-            print('L1 events:', l1_objs)
-            print('  L1 back-pointers:', [e.event_id for e in l1_objs])
+            #print('L2 db id:', l2_db_obj.event_id)
+            #print('L2 beam ids:', l2_db_obj.beams)
+            #print('L1 events:', l1_objs)
+            #print('  L1 back-pointers:', [e.event_id for e in l1_objs])
             session.commit()
 
         print('Output payloads:', len(out_payloads))
@@ -650,16 +659,58 @@ if __name__ == '__main__':
         session.commit()
 
     setup()
+
+    if False:
+        import importlib.resources
+        configfn = 'ks_database.npy'
+        config = importlib.resources.files('chord_frb_sifter.data').joinpath(configfn)
+        ks = None
+        with importlib.resources.as_file(config) as config_path:
+            ks = np.load(config_path)
+        print('Got known sources:', ks)
+        print('dtype:', ks.dtype)
+    
+        '''
+         ID  SOURCE_TYPE      POS_RA_DEG       POS_ERROR_SEMIMAJOR_DEG    DM         DM_ERROR  SPIN_PERIOD_SEC  DM_GALACTIC_NE_2001_MAX    CHIME_FRB_PEAK_FLUX_DENSITY_JY
+                  SOURCE_NAME           POS_DEC_DEG   POS_ERROR_SEMIMINOR_DEG                          SPIN_PERIOD_SEC_ERROR          SPECTRAL_INDEX
+                                                               POS_ERROR_THETA_DEG                                        DM_GALACTIC_YMW_2016_MAX
+        (2580, 1, 'J1336+34', 203.969  , 34.12    , 0.068, 0.068   , 0.,    8.     ,        nan, 1.506  , nan, 23.823574,  20.1787  , 0., 0.)
+        (2581, 1, 'J1748+59', 267.599  , 59.8     , 0.068, 1.268432, 0.,   45.     ,        nan, 0.43604, nan, 46.943584,  40.937115, 0., 0.)
+        (2582, 2, 'J0209+58',  32.273  , 58.178   , 0.068, 0.068   , 0.,   56.     ,        nan,     nan, nan, 90.727585, 106.394104, 0., 0.)
+         ...
+        (7045, 3, '63566525', 215.90079, 82.63237 , 0.068, 0.068   , 0.,  690.67126,  1.6174971,     nan, nan, 45.73806 ,  39.735348, 0., 0.)
+        (7046, 3, '63563443', 186.47298, 65.13165 , 0.068, 0.068   , 0.,  375.2593 , 12.939977 ,     nan, nan, 34.318127,  25.975077, 0., 0.)
+        (7047, 3, '63557484', 121.33715, 51.708534, 0.068, 0.068   , 0., 1095.0455 ,  1.6174971,     nan, nan, 52.56251 ,  48.663383, 0., 0.)]
+        '''
+    
+        from chord_frb_db.models import KnownSource
+        for i in range(len(ks)):
+            name = ks['source_name'][i]
+            ra = ks['pos_ra_deg'][i]
+            dec = ks['pos_dec_deg'][i]
+            dm = ks['dm'][i]
+            typ = ks['source_type'][i]
+    
+            print('Type %i: DM %8.1f, name %s    RA,Dec %10.3f %10.3f' % (typ, dm, name, ra, dec))
+    
+            ks_args = dict(name=name, ra=ra, dec=dec, dm=dm)
+            ks_obj = KnownSource(**ks_args)
+            session.add(ks_obj)
+        session.flush()
+        session.commit()
+
+    sys.exit(0)
+
     pipeline = create_pipeline()
 
-    simple_pipeline = simple_create_pipeline()
+    #simple_pipeline = simple_create_pipeline()
 
-    for file_num in range(10):
+    for file_num in range(3):
         fn = 'events/events-%03i.fits' % file_num
         process_events_file(engine, pipeline, fn)
 
-        print('<<< simple >>>')
-        simple_process_events_file(engine, simple_pipeline, fn)
-        print('<<< /simple >>>')
+        # print('<<< simple >>>')
+        # simple_process_events_file(engine, simple_pipeline, fn)
+        # print('<<< /simple >>>')
 
 
