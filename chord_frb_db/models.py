@@ -116,13 +116,22 @@ class EventBeam(Base):
 
 class KnownSource(Base):
     __tablename__ = 'known_source'
-    id:   Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(64))
-    ra:   Mapped[Optional[float]] = mapped_column(REAL)
-    dec:  Mapped[Optional[float]] = mapped_column(REAL)
-    dm:   Mapped[Optional[float]] = mapped_column(REAL)
-    is_frb:          Mapped[bool] = mapped_column(default=False)
-    is_pulsar:       Mapped[bool] = mapped_column(default=False)
+    id:          Mapped[int] = mapped_column(primary_key=True)
+    name:        Mapped[str] = mapped_column(String(64))
+    # "Pulsar", "FRB" ?
+    source_type: Mapped[str] = mapped_column(String(32))
+    # reference, etc - human readable
+    origin:      Mapped[str] = mapped_column(String(32))
+    ra:          Mapped[float] = mapped_column(REAL)
+    ra_error:    Mapped[Optional[float]] = mapped_column(REAL)
+    dec:         Mapped[float] = mapped_column(REAL)
+    dec_error:   Mapped[Optional[float]] = mapped_column(REAL)
+    dm:          Mapped[float] = mapped_column(REAL)
+    dm_error:    Mapped[Optional[float]] = mapped_column(REAL)
+    s400:        Mapped[Optional[float]] = mapped_column(REAL)
+    s400_error:  Mapped[Optional[float]] = mapped_column(REAL)
+    s1400:       Mapped[Optional[float]] = mapped_column(REAL)
+    s1400_error: Mapped[Optional[float]] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
 class DumbTest(Base):
