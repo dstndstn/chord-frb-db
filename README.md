@@ -75,11 +75,8 @@ the buffer.
 ## Open design questions
 
 * how do we want to track liveness / effective exposure time?
-* does the FRB Search system send null results to the FRB Sifter if no event is found?
-
-
-
-
+* does the FRB Search system send null results to the FRB Sifter if no event is found? (eg, for the purposes of tracking liveness / exposure time)
+* early triggers - need a new actor!
 
 
 

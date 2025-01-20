@@ -116,11 +116,20 @@ class EventBeam(Base):
 
 class KnownSource(Base):
     __tablename__ = 'known_source'
-    id:   Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(64))
-    ra:   Mapped[Optional[float]] = mapped_column(REAL)
-    dec:  Mapped[Optional[float]] = mapped_column(REAL)
-    dm:   Mapped[Optional[float]] = mapped_column(REAL)
+    id:          Mapped[int] = mapped_column(primary_key=True)
+    name:        Mapped[str] = mapped_column(String(64))
+    source_type: Mapped[str] = mapped_column(String(32))
+    origin:      Mapped[str] = mapped_column(String(32))
+    ra:          Mapped[Optional[float]] = mapped_column(REAL)
+    ra_error:    Mapped[Optional[float]] = mapped_column(REAL)
+    dec:         Mapped[Optional[float]] = mapped_column(REAL)
+    dec_error:   Mapped[Optional[float]] = mapped_column(REAL)
+    dm:          Mapped[Optional[float]] = mapped_column(REAL)
+    dm_error:    Mapped[Optional[float]] = mapped_column(REAL)
+    s400:        Mapped[Optional[float]] = mapped_column(REAL)
+    s400_error:  Mapped[Optional[float]] = mapped_column(REAL)
+    s1400:       Mapped[Optional[float]] = mapped_column(REAL)
+    s1400_error: Mapped[Optional[float]] = mapped_column(REAL)
     events: Mapped[List['Event']] = relationship(back_populates='known')
 
 class DumbTest(Base):
