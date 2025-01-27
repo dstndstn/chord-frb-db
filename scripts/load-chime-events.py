@@ -23,6 +23,8 @@ from copy import deepcopy
 # from l4_pipeline.interfaces.L0_baseband.pathfinder_callback_initiator import PathfinderCallbackInitiator
 from frb_common.events.l1_event.dtypes import L1_EVENT_DTYPE
 
+from chord_frb_db.utils import get_db_engine
+
 def read_fits_events(fn):
     from frb_common.events import L1Event
     events = fitsio.read(fn)
@@ -46,18 +48,6 @@ def read_fits_events(fn):
     #print('Final event type:', events.dtype)
     #print('Event timestamp_utc:', events['timestamp_utc'])
     return fpgas,beams,events
-
-def get_db_engine():
-    from sqlalchemy import create_engine
-    from chord_frb_db.models import Base
-    db_url = os.environ.get('CHORD_FRB_DB_URL', 'sqlite+pysqlite:///db.sqlite3')
-    print('Using database URL:', db_url)
-    #engine = create_engine(db_url, echo=True)
-    engine = create_engine(db_url, echo=False)
-    if 'sqlite' in db_url:
-        # Make sure database tables exist
-        Base.metadata.create_all(engine)
-    return engine
 
 def create_pipeline():
     from frb_common import pipeline_tools
