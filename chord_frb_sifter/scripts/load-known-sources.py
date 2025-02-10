@@ -80,8 +80,8 @@ def ingest_rratalog(session):
             xargs.update(dm_error = float(d_dm))
         s1400 = words[23]
         if s1400 != '*':
-            # RRATALOG flux is in Jy
-            xargs.update(s1400 = 1000. * float(s1400))
+            # RRATALOG flux is in mJy (despite what the headers may claim!), database is in mJy
+            xargs.update(s1400 = float(s1400))
 
         args = dict(name=name,
                     source_type='RRAT',
