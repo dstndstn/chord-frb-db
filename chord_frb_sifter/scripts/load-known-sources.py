@@ -19,7 +19,8 @@ https://github.com/dstndstn/rratalog/tree/csv-errors
 from chord_frb_db.models import KnownSource
 from chord_frb_db.utils import get_db_engine
 from sqlalchemy.orm import Session
-from sqlalchemy import delete
+from sqlalchemy import delete, select
+from sqlalchemy.sql.expression import func
 
 def hmsstring2ra(s, sep=':'):
     words = s.split(sep)
@@ -160,9 +161,32 @@ def main():
         session.execute(st)
         session.commit()
 
+    # Load
     with Session(engine) as session:
         ingest_rratalog(session)
         ingest_psrcat(session)
+        session.commit()
+
+    # dump to FITS
+    from astrometry.util.fits import fits_table
+    T = fits_table()
+    keys = ['name', 'source_type', 'ra', 'ra_error', 'dec', 'dec_error', 'dm', 'dm_error',
+            's1400', 's1400_error', 's400', 's400_error']
+    for k in keys:
+        T.set(k, [])
+    with Session(engine) as session:
+        print('Count:', session.execute(select(func.count(KnownSource.id))).scalar_one())
+        query = select(KnownSource)
+        result = session.execute(query)
+        for r in result:
+            (r,) = r
+            for k in keys:
+                v = getattr(r, k)
+                if v is None:
+                    v = 0.
+                T.get(k).append(v)
+    T.to_np_arrays()
+    T.writeto('known-sources.fits')
 
 if __name__ == '__main__':
     main()
