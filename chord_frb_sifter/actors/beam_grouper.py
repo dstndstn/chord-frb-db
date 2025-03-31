@@ -1,8 +1,11 @@
 """
-Contains an actor styled class that groups L1 events in DM,
-time, and position. Grouped events form a candidate L2 event.
+This a CHORD/FRB prototype, modified from the CHIME/FRB code.
+
+It groups L1 events in DM, time, and position.
+Grouped events form a candidate L2 event.
 """
 
+import time
 import json
 import traceback
 import pickle as pickle
@@ -12,27 +15,21 @@ from collections import deque
 import numpy as np
 from scipy.spatial import cKDTree
 import msgpack
-import time
 
 from frb_common import ActorBaseClass
 from frb_common import configuration_manager as cm
 from frb_common.events import L1Event
 
 __author__ = "CHIME FRB Group"
-__version__ = "0.4"
-__maintainer__ = "Alex Josephy"
 __developers__ = "Alex Josephy"
 __email__ = "alexander.josephy@mail.mcgill.ca"
-__status__ = "Epsilon"
-
 
 class BeamGrouper(ActorBaseClass):
     """
     The purpose of this class is to group together L1 events detected in
-    different beams that were presumeably caused by a common incident pulse.
+    different beams that were presumably caused by a common incident pulse.
     These multibeam detections may arise from very bright astrophysical bursts
     as well as near-field RFI.
-
 
     Parameters
     ----------
@@ -41,7 +38,6 @@ class BeamGrouper(ActorBaseClass):
     **kwargs : dict, optional
         Additional parameters are used to initialize superclass
         (``ActorBaseClass``).
-
 
     Extended Summary
     ----------------
@@ -53,19 +49,9 @@ class BeamGrouper(ActorBaseClass):
     method, we need to first define what a *distance* between different events
     means.  To do this, we first scale the aforementioned axes by dividing the
     values by the relevant thresholds. We then apply the Chebyshev metric
-    :sup:`[3]` to get a meaninfgul distance. The above group definition now
+    :sup:`[3]` to get a meaningful distance. The above group definition now
     ensures that, for every event in a group, there exists another event such
     that the *distance* between them is less than 1.
-
-
-    Notes
-    -----
-    This actor expects a multipart message from the ``BeamBuffer`` actor
-    instead of the typical ``L2Event`` objects that downstream actors receive.
-    Because of this, if a ``BeamGrouper`` is wrapped in a ``WorkerProcess``
-    object (as is will be in a pipeline setup), the worker's `use_pickle`
-    parameter should be set to `False`.
-
 
     See Also
     --------
@@ -81,7 +67,6 @@ class BeamGrouper(ActorBaseClass):
     frb_common.WorkerProcess :
         The usual wrapper class :ref:`(link) <pipeline_tools_doc_page>`
 
-
     References
     ----------
     [1] Ester, M., Kriegel, H.P., Sander, J., & Xu, X. A density-based
@@ -92,40 +77,12 @@ class BeamGrouper(ActorBaseClass):
     [2] `DBSCAN <https://en.wikipedia.org/wiki/DBSCAN>`_
 
     [3] `Chebyshev Metric <https://en.wikipedia.org/wiki/Chebyshev_distance>`_
-
     """
-
     def __init__(self, t_thr, dm_thr, ra_thr, dec_thr, **kwargs):
-        super(BeamGrouper, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.thresholds = [t_thr, dm_thr, ra_thr, dec_thr]
         self.dm_activity_lookback = deque([0] * 10, maxlen=10)
         self.beam_activity_lookback = deque([0] * 10, maxlen=10)
-
-        self.frame0_ctime_us = None
-        self.prev_max_fpga = 0
-        self.update()  # handles fpga time info
-
-    def update(self):
-        """
-        Periodically called to check fpga0 info, necessary for handling F-engine
-        restarts. Time info is committed to frb-configs if changed since last
-        check.
-        """
-        prev_value = self.frame0_ctime_us
-        tinfo = None
-        try:  # Only applicable for CHIME network at DRAO
-            command = "curl carillon:54321/get-frame0-time 2> /dev/null"
-            tinfo = check_output(command, shell=True)
-            self.frame0_ctime_us = int(1e6 * json.loads(tinfo)["frame0_ctime"])
-        except:
-            self.frame0_ctime_us = None
-
-        # Save ch_master curl to frb-configs if tinfo information was retrieved on-site.
-        if self.frame0_ctime_us != prev_value and tinfo and self.worker_id == 0:
-            tmp_file = "/tmp/ch_master_curl.json"
-            with open(tmp_file, "w") as output_file:
-                json.dump(tinfo.decode(), output_file)
-            cm.save_config("/home/frb-L2-L3/frb-configs/", "RunParameters", tmp_file)
 
     def perform_action(self, item):
         """Pipeline function that groups L1 events.
@@ -148,6 +105,9 @@ class BeamGrouper(ActorBaseClass):
             the are the result of a ``cPickle.dumps()`` call.
 
         """
+
+        print('BeamGrouper: perform_action:', ('%i events' % len(item) if item is not None else 'none'))
+        
         try:
             groups = self._attempt_perform_action(item)
             self.PROCESS_STATUS.labels(status="success", actor=self.process_name).inc()
@@ -172,10 +132,7 @@ class BeamGrouper(ActorBaseClass):
         #self.print('Beam grouper: parsed events', events)
         #self.print('Beam grouper: timestamps: %s' % str(events['pipeline_timestamp'][:])[:100])
 
-        if self.prev_max_fpga - events.timestamp_fpga.max() > 600 / 2.56e-6:
-            self.update()  # large (>10 min) rollback occured (L0 restarted)
-        self.prev_max_fpga = int(events.timestamp_fpga.max())
-
+        ## ??? shouldn't need this at this point
         if self.frame0_ctime_us:
             new_vals = np.array(2.56 * events.timestamp_fpga + self.frame0_ctime_us, dtype="int")
             events.timestamp_utc[:] = new_vals
@@ -238,7 +195,6 @@ class BeamGrouper(ActorBaseClass):
         tdmxy[:, 3] = events.beam_no % 1000  # y (DEC-like) in beam grid
         tdmxy /= self.thresholds
 
-        #neighbors = cKDTree(tdmxy).query_ball_point(tdmxy, r=1.0, p=np.infty)
         tree = cKDTree(tdmxy)
         neighbors = tree.query_ball_tree(tree, r=1.0, p=np.infty)
 
@@ -270,6 +226,3 @@ class BeamGrouper(ActorBaseClass):
             ungrouped[to_add] = False
             groups[i] = groups[i].append(incoh_events[to_add])
         return groups + [e.reshape(1,) for e in incoh_events[ungrouped]]
-
-    def shutdown(self):
-        self.logger.info("I have shutdown gracefully")

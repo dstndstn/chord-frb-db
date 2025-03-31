@@ -500,10 +500,11 @@ def simple_create_pipeline():
     from frb_common import pipeline_tools
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
+    from chord_frb_sifter.actors.beam_grouper import BeamGrouper
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
-                     # ('BeamGrouper', BeamGrouper),
+                     ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
                      # ('RFISifter', RFISifter),
                      # ('Localizer', Localizer),
@@ -584,16 +585,15 @@ def simple_process_events_file(engine, pipeline, fn):
         ubeams = np.unique(b)
         print(len(I), 'events for FPGA', fpga, 'in', len(ubeams), 'beams')
         for beam in ubeams:
-            # Events for this FPGA and beam number
+            # Events for this FPGA chunk and beam number
             J = np.flatnonzero(b == beam)
             K = I[J]
             beam_events = [events[k] for k in K]
-            for e in beam_events:
-                e['fpga_chunk'] = fpga
-                # the events already have a "beam_no" field ... weirdly in float format
-                e['beam_no'] = int(e['beam_no'])
+
+            #print('beam_events:', beam_events)
+
             outputs = simple_process_events(pipeline, beam_events)
-            #outputs = simple_process_events(pipeline, fpga, beam, beam_events)
+
             if outputs is None:
                 print('Pipeline outputs:', outputs)
             else:
@@ -606,22 +606,32 @@ def simple_process_events_file(engine, pipeline, fn):
 def simple_read_fits_events(fn):
     events = fitsio.read(fn)
     print('Events file', fn, 'contains', len(events), 'events')
-
     beams = events['beam']
     fpgas = events['fpga']
     frame0nano = events['frame0_nano']
-
     eventlist = [{} for i in range(len(events))]
     for k in events.dtype.names:
-        if k in ['frame0_nano', 'beam', 'fpga']:
-            continue
-        for i in range(len(events)):
-            eventlist[i][k] = events[k][i]
+        # output field name
+        k_out = k
+        # data vector for this column
+        v = events[k]
 
-    # compute timestamp_fpga to timestamp_utc (in micro-seconds)
-    # ASSUME 2.56 microseconds per FPGA sample
-    for i in range(len(events)):
-        eventlist[i]['timestamp_utc'] = frame0nano[i]/1000. + eventlist[i]['timestamp_fpga'] * 2.56
+        if k == 'beam_no':
+            # duplicate of "beam", but in float for some reason
+            continue
+        if k == 'fpga':
+            # rename!  This is the FPGAcount for the time chunk of data
+            k_out = 'chunk_fpga'
+
+        for i in range(len(events)):
+            eventlist[i][k_out] = v[i]
+
+    for e in eventlist:
+        # compute timestamp_fpga to timestamp_utc (in micro-seconds)
+        # ASSUME 2.56 microseconds per FPGA sample
+        e['timestamp_utc'] = e['frame0_nano']/1000. + e['timestamp_fpga'] * 2.56
+        # For completeness, also compute the chunk timestamp in UTC.
+        e['chunk_utc'] = e['frame0_nano']/1000. + e['chunk_fpga'] * 2.56
 
     print('Event keys:', eventlist[0].keys())
     return fpgas,beams,eventlist
@@ -689,18 +699,16 @@ if __name__ == '__main__':
         session.flush()
         session.commit()
 
-    sys.exit(0)
+        sys.exit(0)
 
-    pipeline = create_pipeline()
+    #pipeline = create_pipeline()
 
-    #simple_pipeline = simple_create_pipeline()
+    simple_pipeline = simple_create_pipeline()
 
     for file_num in range(3):
         fn = 'events/events-%03i.fits' % file_num
-        process_events_file(engine, pipeline, fn)
+        #process_events_file(engine, pipeline, fn)
 
         # print('<<< simple >>>')
-        # simple_process_events_file(engine, simple_pipeline, fn)
+        simple_process_events_file(engine, simple_pipeline, fn)
         # print('<<< /simple >>>')
-
-
