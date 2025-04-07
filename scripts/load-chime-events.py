@@ -575,7 +575,50 @@ def simple_process_events(pipeline, events):
     #outputs = process_events(pipeline, event_data)
 
 
-def simple_process_events_file(engine, pipeline, fn):
+def chime_beam_numbers_to_sky_grid(beams):
+    # beam locations in units of "beam spacing" ... used by BeamGrouper, used related to thresholds
+    # (in config file) ra_thr=3.1, dec_thr=2.1.
+    beams = np.array(beams)
+    ra_num = beams // 1000
+    dec_num = beams % 1000
+    return ra_num, dec_num
+    
+def chime_beam_numbers_to_dra_ddec(beams):
+    beams = np.array(beams)
+    ra_num = beams // 1000
+    dec_num = beams % 1000
+
+    northmost_beam = 60.0
+    from scipy import constants as phys_const
+    delta_y_feed_m = 0.3048
+    freq_ref = (phys_const.speed_of_light * 128 /(np.sin(northmost_beam * np.pi / 180.0) * delta_y_feed_m * 256))
+    clamp_freq = freq_ref
+
+    Ny = 256
+    feed_sep = delta_y_feed_m
+    reference_indices = np.arange(Ny) + 1 - Ny / 2.0
+    reference_angles = np.rad2deg(
+        np.arcsin(phys_const.speed_of_light * reference_indices
+                  / (clamp_freq * Ny * feed_sep)
+                  )
+    )
+    print('reference_angles', reference_angles)
+
+    print('dec_num', dec_num.max(), 'refs', len(reference_angles))
+    
+    assert(np.all(dec_num >= 0))
+    assert(np.all(dec_num < len(reference_angles)))
+    ddec = np.array(reference_angles)[dec_num]
+
+    assert(np.all(ra_num >= 0))
+    assert(np.all(ra_num < 4))
+    ew_spacing = [-0.4,0,0.4,0.8]
+    dra  = np.array(ew_spacing)[ra_num]
+    return dra,ddec
+
+    
+def simple_process_events_file(engine, pipeline, fn,
+                               beam_to_dradec={}, beam_to_xygrid={}):
     from sqlalchemy.orm import Session
     fpgas,beams,events = simple_read_fits_events(fn)
     u_fpgas = np.unique(fpgas)
@@ -590,9 +633,19 @@ def simple_process_events_file(engine, pipeline, fn):
             K = I[J]
             beam_events = [events[k] for k in K]
 
+            gx,gy = beam_to_xygrid[beam]
+            for e in beam_events:
+                e['beam_grid_x'] = gx
+                e['beam_grid_y'] = gy
+            dr,dd = beam_to_dradec[beam]
+            for e in beam_events:
+                e['beam_dra'] = dr
+                e['beam_ddec'] = dd
+
             #print('beam_events:', beam_events)
 
             outputs = simple_process_events(pipeline, beam_events)
+                                            
 
             if outputs is None:
                 print('Pipeline outputs:', outputs)
@@ -705,10 +758,18 @@ if __name__ == '__main__':
 
     simple_pipeline = simple_create_pipeline()
 
+    beams = np.hstack([np.arange(256) + i*1000 for i in range(4)])
+    dra,ddec = chime_beam_numbers_to_dra_ddec(beams)
+    beam_to_dradec = dict([(k,(v1,v2)) for k,v1,v2 in zip(beams, dra, ddec)])
+    xg,yg = chime_beam_numbers_to_sky_grid(beams)
+    beam_to_xygrid = dict([(k,(v1,v2)) for k,v1,v2 in zip(beams, xg, yg)])
+
     for file_num in range(3):
         fn = 'events/events-%03i.fits' % file_num
         #process_events_file(engine, pipeline, fn)
 
         # print('<<< simple >>>')
-        simple_process_events_file(engine, simple_pipeline, fn)
+        simple_process_events_file(engine, simple_pipeline, fn,
+                                   beam_to_dradec=beam_to_dradec,
+                                   beam_to_xygrid=beam_to_xygrid)
         # print('<<< /simple >>>')
