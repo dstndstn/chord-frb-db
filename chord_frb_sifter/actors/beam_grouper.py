@@ -26,6 +26,41 @@ __author__ = "CHIME FRB Group"
 __developers__ = "Alex Josephy"
 __email__ = "alexander.josephy@mail.mcgill.ca"
 
+# This incorporates steps that used to be in the EventMaker actor.
+def create_l2_event(l1_events, **kwargs):
+    print('Creating L2 event from L1 events:')
+    for e in l1_events:
+        print('  ', e)
+    from collections import Counter
+    print('Beam counts:', Counter([e['beam'] for e in l1_events]))
+    #
+    # Keep only the max-SNR event for each beam.
+    beam_maxsnr = {}
+    for e in l1_events:
+        beam = e['beam']
+        snr = e['snr']
+        if beam in beam_maxsnr:
+            (oldsnr,_) = beam_maxsnr[beam]
+            if snr > oldsnr:
+                beam_maxsnr[beam] = (snr,e)
+        else:
+            beam_maxsnr[beam] = (snr, e)
+    # Initialize L2 elements from the max-SNR event
+    keep = []
+    best_event = None
+    best_snr = 0.
+    for snr,e in beam_maxsnr.values():
+        keep.append(e)
+        if snr > best_snr:
+            best_snr = snr
+            best_event = e
+    l1_events = keep
+    l2_event = best_event.copy()
+    #
+    l2_event.update(kwargs)
+    l2_event['l1_events'] = l1_events
+    return l2_event
+
 class BeamGrouper(Actor):
     """
     The purpose of this class is to group together L1 events detected in
@@ -117,15 +152,17 @@ class BeamGrouper(Actor):
         #         pass
 
         #"dm_std": coh_events.dm.std(),
+        l2_events = []
         for group in groups:
-            for e in group:
-                e.update(beam_activity=beam_activity,
-                         dm_activity=dm_activity,
-                         beam_activity_lookback=self.beam_activity_lookback,
-                         dm_activity_lookback=self.dm_activity_lookback,
-                         avg_l1_grade=avg_l1_grade,
-                         )
-        return groups
+            l2_event = create_l2_event(group,
+                                       beam_activity=beam_activity,
+                                       dm_activity=dm_activity,
+                                       beam_activity_lookback=self.beam_activity_lookback,
+                                       dm_activity_lookback=self.dm_activity_lookback,
+                                       avg_l1_grade=avg_l1_grade,
+                                       )
+            l2_events.append(l2_event)
+        return l2_events
 
     def _cluster(self, events):
         """ Performs event clustering via DBSCAN algorithm """
