@@ -18,7 +18,19 @@ def run():
             response = stub.SayHello(helloworld_pb2.HelloRequest(name="you%i" % i))
             print("Greeter client received: " + response.message)
 
+def run_async():
+    print('Sending messages (async)...')
+    with grpc.insecure_channel("localhost:50051") as channel:
+        stub = helloworld_pb2_grpc.GreeterStub(channel)
+        futures = []
+        for i in range(100):
+            response = stub.SayHello.future(helloworld_pb2.HelloRequest(name="msg%i" % i))
+            futures.append(response)
+        print('Waiting for async replies...')
+        for f in futures:
+            print('Reply:', f.result().message)
 
 if __name__ == "__main__":
     logging.basicConfig()
-    run()
+    #run()
+    run_async()
