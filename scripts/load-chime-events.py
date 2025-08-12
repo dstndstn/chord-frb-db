@@ -692,8 +692,39 @@ def simple_read_fits_events(fn):
 if __name__ == '__main__':
     '''
     export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/:../L4_pipeline/:../L4_databases/
+
+    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/
     '''
 
+    from frb_common import pipeline_tools
+    from frb_L2_L3.actors.localizer import Localizer
+
+    import importlib.resources
+    # all pipeline behaviour is encoded in config file
+    print('Loading config file...')
+    configfn = 'drao_epsilon_pipeline_local.yaml'
+    config = importlib.resources.files('chord_frb_sifter.config').joinpath(configfn)
+    with importlib.resources.as_file(config) as config_path:
+        pipeline_tools.load_configuration(config_path)
+    bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
+    
+    name,clz = ('Localizer', Localizer)
+    conf = pipeline_tools.get_worker_configuration(name)
+    print('Got localizer config:', conf)
+    conf.pop('io')
+    conf.pop('log')
+    picl = conf.pop('use_pickle')
+    conf.pop('timeout')
+    conf.pop('periodic_update')
+    p = clz(**conf)
+    print('Got Localizer:', p)
+
+    # from frb_L2_L3.actors.localizer import lookup
+    
+    sys.exit(0)
+    
+    
+    
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from chord_frb_db.models import Base, EventBeam, Event
