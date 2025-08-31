@@ -796,12 +796,9 @@ if __name__ == '__main__':
     #xg,yg = chime_beam_numbers_to_sky_grid(beams)
 
     bm = cfbm.current_model_class()
-    beam_tel_xcoord, beam_tel_ycoord = bm.get_cartesian_from_position(
+    xg, yg = bm.get_cartesian_from_position(
         *bm.get_beam_positions(beams,freqs=bm.clamp_freq).squeeze().T
         )
-
-    xg = beam_tel_xcoord / (beam_tel_xcoord[0] - beam_tel_xcoord[256])
-    yg = beam_tel_ycoord / (beam_tel_ycoord[1] - beam_tel_ycoord[0])
     
     beam_to_xygrid = dict([(k,(v1,v2)) for k,v1,v2 in zip(beams, xg, yg)])
 
