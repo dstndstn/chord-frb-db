@@ -696,6 +696,7 @@ if __name__ == '__main__':
     export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/
     '''
 
+    
     from frb_common import pipeline_tools
     from frb_L2_L3.actors.localizer import Localizer
 
@@ -707,17 +708,21 @@ if __name__ == '__main__':
     with importlib.resources.as_file(config) as config_path:
         pipeline_tools.load_configuration(config_path)
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
-    
-    name,clz = ('Localizer', Localizer)
+
+    #from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+    from frb_L2_L3.actors.rfi_sifter import RFISifter
+
+    #name,clz = ('Localizer', Localizer)
+    name,clz = ('RFISifter', RFISifter)
     conf = pipeline_tools.get_worker_configuration(name)
-    print('Got localizer config:', conf)
+    print('Got actor config:', conf)
     conf.pop('io')
     conf.pop('log')
     picl = conf.pop('use_pickle')
     conf.pop('timeout')
     conf.pop('periodic_update')
     p = clz(**conf)
-    print('Got Localizer:', p)
+    print('Got actor:', p)
 
     # from frb_L2_L3.actors.localizer import lookup
     
