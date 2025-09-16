@@ -11,14 +11,15 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
     def CheckConfiguration(self, request, context):
         conf = request.yaml
+        print('CheckConfiguration: context', context)
+        print('  peer:', context.peer())
         print('Received YAML config: "%s"' % conf)
-        ok = False
+        ok = True
         if self.config is None:
             self.config = conf
-            ok = True
         else:
             if self.config == conf:
-                ok = True
+                pass
             else:
                 print('YAML config mismatch!')
                 ok = False

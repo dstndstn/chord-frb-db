@@ -21,16 +21,31 @@ if __name__ == '__main__':
     # FRB Search node 1
     ch1 = grpc.insecure_channel(sifter_addr)
     stub1 = FrbSifterStub(ch1)
-    msg = ConfigMessage(yaml=yaml_config_str);
+    msg = ConfigMessage(yaml=yaml_config_str)
     r1 = stub1.CheckConfiguration(msg)
-    print('Got config check result:', r1)
+    print('Got config check result:', r1.ok)
+    assert(r1.ok)
 
     # FRB Search node 2
     ch2 = grpc.insecure_channel(sifter_addr)
     stub2 = FrbSifterStub(ch2)
-    msg = ConfigMessage(yaml=yaml_config_str);
+    msg = ConfigMessage(yaml=yaml_config_str)
     r2 = stub2.CheckConfiguration(msg)
-    print('Got config check result:', r2)
+    print('Got config check result:', r2.ok)
+    assert(r2.ok)
+
+    yaml_config.update({'another_thing':17})
+    yaml_2 = yaml.dump(yaml_config)
+
+    # FRB Search node 3
+    ch3 = grpc.insecure_channel(sifter_addr)
+    stub3 = FrbSifterStub(ch3)
+    msg = ConfigMessage(yaml=yaml_2)
+    r3 = stub3.CheckConfiguration(msg)
+    print('Got config check result:', r3.ok)
+    assert(not(r3.ok))
+
+
 
     
     server.wait_for_termination()
