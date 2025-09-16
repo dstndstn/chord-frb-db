@@ -4,9 +4,10 @@ import queue
 
 
 class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
-    def __init__(self):
+    def __init__(self, injections):
         # SimpleQueue is thread-safe
         self.message_queue = queue.SimpleQueue()
+        self.injections = injections
         self.config = None
 
     def CheckConfiguration(self, request, context):
@@ -25,7 +26,20 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                 ok = False
         r = ConfigReply(ok=ok)
         return r
-    
+
+    def FrbEvents(self, request, context):
+        print('FRB Events')
+        if request.has_injections != self.injections:
+            print('Received FRB Events %s injections, but this FRB Sifter is%s handling injections!' % ('with' if request.has_injections else 'without', '' if self.injections else ' not'))
+            return FrbEventsReply(ok=False, message='Expected has_injections=%s, got %s - are you sending to the wrong FRB Sifter (injection vs prod)?' % (self.injections, request.has_injections))
+        msg = ''
+        ok = True
+
+        print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_count, 'with', len(request.events), 'events')
+        for e in request.events:
+            print('  event', e)
+        
+        return FrbEventsReply(ok=ok, message=msg)
 
 def serve(sifter, port=50051, max_threads=10):
     import grpc

@@ -50,5 +50,6 @@ message FrbEventsMessage {
 
 message FrbEventsReply {
   bool ok = 1;
+  string message = 2;
 }
 

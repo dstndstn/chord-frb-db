@@ -9,7 +9,11 @@ if __name__ == '__main__':
     import logging
     logging.basicConfig()
     port = 50051
-    sifter = FrbSifter()
+    injections = False
+
+    fpga_counts_per_sec = 390625
+    
+    sifter = FrbSifter(injections)
     server = serve(sifter, port=port)
 
     sifter_addr = 'localhost:' + str(port)
@@ -45,8 +49,39 @@ if __name__ == '__main__':
     print('Got config check result:', r3.ok)
     assert(not(r3.ok))
 
+    # FRB events
+    events = []
+    chunk_fpga = fpga_counts_per_sec * 10
+    msg = FrbEventsMessage(has_injections=not(injections),
+                           beam_set_id = 1,
+                           chunk_fpga_count = chunk_fpga,
+                           events = [])
+    r1 = stub1.FrbEvents(msg)
+    print('Got FRB events reply:', r1.ok, r1.message)
+    assert(not(r1.ok))
 
+    events = []
+    chunk_fpga = fpga_counts_per_sec * 10
+    for b in range(10):
+        events.append(FrbEvent(beam_id=b,
+                               fpga_timestamp = chunk_fpga, # + ...
+                               dm = 100.,
+                               dm_error = 1.0,
+                               snr = 8.,
+                               rfi_prob = 0.1))
 
-    
+    msg = FrbEventsMessage(has_injections=injections,
+                           beam_set_id = 1,
+                           chunk_fpga_count = chunk_fpga,
+                           events = events)
+    r1 = stub1.FrbEvents(msg)
+    print('Got FRB events reply:', r1)
+
+    ch1.close()
+    ch2.close()
+    ch3.close()
+
+    grace = 1.
+    server.stop(grace)
     server.wait_for_termination()
 
