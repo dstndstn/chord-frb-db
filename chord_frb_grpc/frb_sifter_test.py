@@ -6,6 +6,7 @@ from chord_frb_grpc.frb_sifter_pb2 import ConfigMessage, FrbEventsMessage, FrbEv
 from chord_frb_grpc.frb_sifter_pb2_grpc import FrbSifterStub
 
 if __name__ == '__main__':
+    import time
     import logging
     logging.basicConfig()
     port = 50051
@@ -62,7 +63,7 @@ if __name__ == '__main__':
 
     events = []
     chunk_fpga = fpga_counts_per_sec * 10
-    for b in range(10):
+    for b in range(1000):
         events.append(FrbEvent(beam_id=b,
                                fpga_timestamp = chunk_fpga, # + ...
                                dm = 100.,
@@ -76,6 +77,15 @@ if __name__ == '__main__':
                            events = events)
     r1 = stub1.FrbEvents(msg)
     print('Got FRB events reply:', r1)
+
+    t0 = time.process_time()
+    s = msg.SerializeToString()
+    t1 = time.process_time()
+    m2 = FrbEventsMessage()
+    e = m2.ParseFromString(s)
+    t2 = time.process_time()
+    print('Serialized FRB message for %i events: length %i bytes' % (len(events), len(s)))
+    print('Encoding took %.3f sec, decoding took %.3f sec' % (t1-t0, t2-t1))
 
     ch1.close()
     ch2.close()
