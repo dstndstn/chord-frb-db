@@ -36,10 +36,33 @@ using grpc::Status;
 //using helloworld::HelloReply;
 //using helloworld::HelloRequest;
 
-// class GreeterClient {
-//  public:
-//   GreeterClient(std::shared_ptr<Channel> channel)
-//       : stub_(Greeter::NewStub(channel)) {}
+class FrbSifterClient {
+public:
+    FrbSifterClient(std::shared_ptr<Channel> channel)
+        : stub_(FrbSifter::NewStub(channel)) {}
+
+    bool CheckConfiguration(const std::string& config_yaml) {
+        ConfigMessage msg;
+        msg.set_yaml(config_yaml);
+        ConfigReply reply;
+        reply.set_ok(false);
+
+        ClientContext context;
+        Status status = stub_->CheckConfiguration(&context, msg, &reply);
+        // Act upon its status.
+        if (status.ok()) {
+            return reply.ok();
+        } else {
+            std::cout << status.error_code() << ": " << status.error_message()
+                      << std::endl;
+            return false;
+        }
+    }
+
+private:
+  std::unique_ptr<FrbSifter::Stub> stub_;
+
+};
 // 
 //   // Assembles the client's payload, sends it and presents the response back
 //   // from the server.
@@ -81,11 +104,11 @@ int main(int argc, char** argv) {
   // We indicate that the channel isn't authenticated (use of
   // InsecureChannelCredentials()).
 
-  // GreeterClient greeter(
-  //     grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
-  // std::string user("world");
-  // std::string reply = greeter.SayHello(user);
-  // std::cout << "Greeter received: " << reply << std::endl;
+  FrbSifterClient sifter(grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
+
+  std::string config_yaml("ceci n'est pas yaml");
+  bool ok = sifter.CheckConfiguration(config_yaml);
+  std::cout << "Sifter config check: " << ok << std::endl;
 
   return 0;
 }

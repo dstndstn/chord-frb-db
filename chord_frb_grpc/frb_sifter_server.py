@@ -58,6 +58,7 @@ def serve(sifter, port=50051, max_threads=10):
 if __name__ == '__main__':
     import logging
     logging.basicConfig()
-    sifter = FrbSifter()
+    is_injections = False
+    sifter = FrbSifter(is_injections)
     server = serve(sifter)
     server.wait_for_termination()
