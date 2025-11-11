@@ -351,13 +351,14 @@ def simple_create_pipeline():
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+    from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
                      # ('RFISifter', RFISifter),
-                     # ('Localizer', Localizer),
+                     ('Localizer', SimpleLocalizer),
                      # ('KnownSourceSifter', KnownSourceSifter),
                      # ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
@@ -559,24 +560,25 @@ if __name__ == '__main__':
         pipeline_tools.load_configuration(config_path)
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
 
-    #from chord_frb_sifter.actors.beam_grouper import BeamGrouper
-    from frb_L2_L3.actors.rfi_sifter import RFISifter
-
-    #name,clz = ('Localizer', Localizer)
-    name,clz = ('RFISifter', RFISifter)
-    conf = pipeline_tools.get_worker_configuration(name)
-    print('Got actor config:', conf)
-    conf.pop('io')
-    conf.pop('log')
-    picl = conf.pop('use_pickle')
-    conf.pop('timeout')
-    conf.pop('periodic_update')
-    p = clz(**conf)
-    print('Got actor:', p)
-
-    # from frb_L2_L3.actors.localizer import lookup
+    if False:
+        #from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+        from frb_L2_L3.actors.rfi_sifter import RFISifter
     
-    sys.exit(0)
+        #name,clz = ('Localizer', Localizer)
+        name,clz = ('RFISifter', RFISifter)
+        conf = pipeline_tools.get_worker_configuration(name)
+        print('Got actor config:', conf)
+        conf.pop('io')
+        conf.pop('log')
+        picl = conf.pop('use_pickle')
+        conf.pop('timeout')
+        conf.pop('periodic_update')
+        p = clz(**conf)
+        print('Got actor:', p)
+    
+        # from frb_L2_L3.actors.localizer import lookup
+        
+        sys.exit(0)
     
     
     
