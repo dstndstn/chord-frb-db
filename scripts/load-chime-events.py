@@ -502,13 +502,14 @@ def simple_create_pipeline():
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+    from chord_frb_sifter.actors.localizer import Localizer
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
                      # ('RFISifter', RFISifter),
-                     # ('Localizer', Localizer),
+                      ('Localizer', Localizer),
                      # ('KnownSourceSifter', KnownSourceSifter),
                      # ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
@@ -698,7 +699,7 @@ if __name__ == '__main__':
     '''
 
     from frb_common import pipeline_tools
-    from frb_L2_L3.actors.localizer import Localizer
+    #from frb_L2_L3.actors.localizer import Localizer
 
     import importlib.resources
     # all pipeline behaviour is encoded in config file
@@ -709,20 +710,20 @@ if __name__ == '__main__':
         pipeline_tools.load_configuration(config_path)
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
     
-    name,clz = ('Localizer', Localizer)
-    conf = pipeline_tools.get_worker_configuration(name)
-    print('Got localizer config:', conf)
-    conf.pop('io')
-    conf.pop('log')
-    picl = conf.pop('use_pickle')
-    conf.pop('timeout')
-    conf.pop('periodic_update')
-    p = clz(**conf)
-    print('Got Localizer:', p)
+    #name,clz = ('Localizer', Localizer)
+    #conf = pipeline_tools.get_worker_configuration(name)
+    #print('Got localizer config:', conf)
+    #conf.pop('io')
+    #conf.pop('log')
+    #picl = conf.pop('use_pickle')
+    #conf.pop('timeout')
+    #conf.pop('periodic_update')
+    #p = clz(**conf)
+    #print('Got Localizer:', p)
 
     # from frb_L2_L3.actors.localizer import lookup
     
-    sys.exit(0)
+    #sys.exit(0)
     
     
     

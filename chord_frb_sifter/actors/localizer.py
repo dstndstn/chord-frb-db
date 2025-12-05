@@ -7,6 +7,7 @@ It determines the best-fit sky position of the event based on the S/N per beam.
 import numpy as np
 from scipy.optimize import least_squares
 import cfbm
+from datetime import datetime
 
 from chord_frb_sifter.actors.actor import Actor
 
@@ -31,22 +32,32 @@ class Localizer(Actor):
         Perform the localization action on the given event.
         """
 
-        beams = event.l1_events["beam_nos"]
-        snrs = event.l1_events["snr"]
+
+        # fix this after making L1Events recarray?
+        beams = []
+        snrs = []
+        for e in event["l1_events"]:
+            beams.append(e["beam"])
+            snrs.append(e["snr"])
+        beams = np.array(beams)
+        snrs = np.array(snrs)
 
         # get beam positions from the beam model. If calced earlier and attached
         # to L2 header can use that instead.
-        x, y = self.bm.get_cartesian_from_position(
-            *self.bm.get_beam_positions(beams,freqs=bm.clamp_freq).squeeze().T
-        )
+        step1 = self.bm.get_beam_positions(beams,freqs=self.bm.clamp_freq)[:,0,:].T
+        x,y = self.bm.get_cartesian_from_position(*step1)
 
         central_freq = 600.0 # 600.0 MHz for CHIME, should be 900.0 for CHORD
 
         x_out, y_out, x_err, y_err = fit_2dgauss_simplified(x,y,snrs,central_freq)
 
         # For CHORD will translate directly from unit sphere coords to equat.
-        pos = bm.get_position_from_cartesian(x_out, y_out)
-        ra, dec = bm.get_equatorial_from_position(pos[0],pos[1],event.timestamp_utc)
+        pos = self.bm.get_position_from_cartesian(x_out, y_out)
+        #t = np.datetime64(int(event["timestamp_utc"]),"us")
+
+        # ephem needs time to be a datetime object (and not a np.datetime64)
+        t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
+        ra, dec = self.bm.get_equatorial_from_position(pos[0],pos[1],t)
 
         # Setting these to what they are called in the DB schema.
         event["ra"] = ra
@@ -56,6 +67,9 @@ class Localizer(Actor):
         # Should be reasonable if near meridian and errors are small.
         event["ra_err"] = np.rad2deg(x_err)
         event["dec_err"] = np.rad2deg(y_err)
+        print(ra,dec,x_err,y_err)
+
+        return [event]
         
 
 def gauss2d(xy,A,x0,y0,sigma_x,sigma_y):
@@ -103,10 +117,13 @@ def fit_2dgauss_simplified(x,y,snr,central_freq):
 
     # estimate output covariance matrix from Jacobian    
     J = result.jac
-    if np.any(J==0): # singular
-        x_err, y_err = np.NaN, np.NaN # use a fiducial error (e.g. N*beam width) instead?
-    else:
+    #if np.any(J==0): # singular
+    #    x_err, y_err = np.nan, np.nan # use a fiducial error (e.g. N*beam width) instead?
+    #else:
+    try:
         pcov = np.linalg.inv(J.T.dot(J))
         x_err, y_err = np.sqrt(np.diag(pcov))
+    except np.linalg.LinAlgError:
+        x_err, y_err = np.nan, np.nan
 
     return x_out, y_out, x_err, y_err
