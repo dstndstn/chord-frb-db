@@ -109,10 +109,10 @@ def serve():
     intensity_thread = threading.Thread(target=intensity_callback_loop,
                                         name='intensity-callbac')
     intensity_thread.start()
-
     pipeline_loop()
-    server.wait_for_termination()
+    return server
 
 if __name__ == "__main__":
     logging.basicConfig()
-    serve()
+    server = serve()
+    server.wait_for_termination()

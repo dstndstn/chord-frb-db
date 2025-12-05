@@ -8,19 +8,6 @@ import fitsio
 
 from copy import deepcopy
 
-# L4 actors
-#from l4_pipeline.interfaces.L3_headers.register_event import RegisterEvent
-# from l4_pipeline.interfaces.L3_headers.write_header import WriteHeader
-# from l4_pipeline.interfaces.L3_headers.send_to_frb_master import SendToFRBMaster
-# from l4_pipeline.interfaces.L3_headers.action_throttler import ActionThrottler
-# from l4_pipeline.interfaces.multiwavelength_maps.map_maker import MapMaker
-# from l4_pipeline.interfaces.vo_event_sender.vo_event_sender import VOEventSender
-# from l4_pipeline.interfaces.L1_intensity.intensity_callback_initiator import IntensityCallbackInitiator
-# from l4_pipeline.interfaces.L1_intensity.cascade_maker import CascadeMaker
-# from l4_pipeline.interfaces.L0_baseband.alert_outriggers import AlertOutriggers
-# from l4_pipeline.interfaces.L0_baseband.baseband_callback_initiator import BasebandCallbackInitiator
-# from l4_pipeline.interfaces.L0_baseband.baseband_analysis import BasebandAnalysis
-# from l4_pipeline.interfaces.L0_baseband.pathfinder_callback_initiator import PathfinderCallbackInitiator
 from frb_common.events.l1_event.dtypes import L1_EVENT_DTYPE
 import cfbm
 
@@ -49,73 +36,6 @@ def read_fits_events(fn):
     #print('Final event type:', events.dtype)
     #print('Event timestamp_utc:', events['timestamp_utc'])
     return fpgas,beams,events
-
-def create_pipeline():
-    from frb_common import pipeline_tools
-
-    from frb_L2_L3.actors.beam_buffer import BeamBuffer
-    from frb_L2_L3.actors.beam_grouper import BeamGrouper
-    from frb_L2_L3.actors.event_maker import EventMaker
-    from frb_L2_L3.actors.rfi_sifter import RFISifter
-    from frb_L2_L3.actors.localizer import Localizer
-    from frb_L2_L3.actors.known_source_sifter import KnownSourceSifter
-    from frb_L2_L3.actors.dm_checker import DMChecker
-    from frb_L2_L3.actors.flux_estimator import FluxEstimator
-    from frb_L2_L3.actors.action_picker import ActionPicker
-
-    pipeline = []
-    for name,clz in [('BeamBuffer', BeamBuffer),
-                     ('BeamGrouper', BeamGrouper),
-                     ('EventMaker', EventMaker),
-                     ('RFISifter', RFISifter),
-                     ('Localizer', Localizer),
-                     ('KnownSourceSifter', KnownSourceSifter),
-                     ('DMChecker', DMChecker),
-                     ('FluxEstimator', FluxEstimator),
-                     ('ActionPicker', ActionPicker),
-                     ]:
-        conf = pipeline_tools.get_worker_configuration(name)
-        #print('conf:', conf)
-        conf.pop('io')
-        conf.pop('log')
-        picl = conf.pop('use_pickle')
-        conf.pop('timeout')
-        conf.pop('periodic_update')
-        p = clz(**conf)
-        picl = False
-        unpickle_output = (name == 'BeamGrouper')
-        pipeline.append((p,picl,unpickle_output))
-    return pipeline
-
-
-def process_events_file(engine, pipeline, fn):
-    from sqlalchemy.orm import Session
-
-    #all_payloads = []
-
-    fpgas,beams,events = read_fits_events(fn)
-    #fpga_start = int(events.timestamp_fpga.min())
-
-    # FIXME -- could assume events files are sorted by FPGA and time....
-    u_fpgas = np.unique(fpgas)
-    for fpga in u_fpgas:
-        I = np.flatnonzero(fpgas == fpga)
-        e = events[I]
-        b = beams[I]
-        ubeams = np.unique(b)
-        print(len(I), 'events for FPGA', fpga, 'in', len(ubeams), 'beams')
-        for beam in ubeams:
-            # Events for this FPGA and beam number
-            J = np.flatnonzero(b == beam)
-            beam_events = e[J]
-            events_string = b''.join([e.tobytes() for e in beam_events])
-            event_data = [str(beam).encode(), str(fpga).encode(), events_string]
-            outputs = process_events(pipeline, event_data)
-            print('Pipeline outputs:', outputs)
-            if len(outputs):
-                # transaction block -- automatic commit on exit
-                with Session(engine) as session:
-                    payloads = send_to_db(session, outputs)
 
 def send_to_db(session, outputs):
     from chord_frb_db.models import EventBeam, Event
@@ -411,76 +331,6 @@ list of L1 events
      snr_vs_spectral_index_x [-3.0, 3.0]
 '''
 
-def process_events(pipeline, e):
-    # e: event tuple
-    input_events = [e]
-    output_events = []
-    for actor,picl,unpicl_out in pipeline:
-        print('Running pipeline stage', actor.process_name)
-        output_events = []
-        for in_item in input_events:
-            #print('Input to', actor.process_name, ':', in_item)
-            if picl:
-                in_item = [pickle.loads(x, encoding="latin1") for x in in_item]
-            if len(in_item) == 1:
-                in_item = in_item[0]
-
-            in_item = deepcopy(in_item)
-            #print('in_item deepcopy:', in_item)
-            items = actor.perform_action(in_item)
-            #print('Produced output:', items)
-            if items is None:
-                continue
-
-            tnow = time.monotonic()
-            for item in items:
-
-                try:
-                    #print('l1_events dtype:', item.l1_events.dtype)
-                    #print('l1 timestamps:', item.l1_events['pipeline_timestamp'])
-
-                    #t = item.l1_events['pipeline_timestamp']
-                    t = item.l1_events['l1_timestamp']
-                    pid = item.l1_events['pipeline_id']
-                    for i in range(len(pid)):
-                        print('Stage %s: Elapsed Time for %i: %.3f sec' % (actor.process_name, pid[i], tnow - t[i]))
-
-                except:
-                    pass
-
-                if item is None:
-                    continue
-
-                if not isinstance(item, (list, tuple)):
-                    item = [item]
-                #print('Output from', actor.process_name, ':', item)
-                if picl:
-                    item = [pickle.dumps(x, protocol=2) for x in item]
-                if unpicl_out:
-                    item = [pickle.loads(x, encoding="latin1") for x in item]
-
-                output_events.append(item)
-        if len(output_events) == 0:
-            break
-        input_events = output_events
-
-    # end of pipeline
-    outputs = []
-    for out_list in output_events:
-        outx = []
-        for out in out_list:
-            try:
-                out = pickle.loads(out, encoding="latin1")
-            except:
-                pass
-            # try:
-            #     out = out.database_payload()
-            # except:
-            #     pass
-            outx.append(out)
-        outputs.append(outx)
-    return outputs
-    
 def setup():
     from frb_common import pipeline_tools
     from frb_common.events import L1Event
@@ -503,13 +353,15 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
     from chord_frb_sifter.actors.localizer import Localizer
+    from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
                      # ('RFISifter', RFISifter),
-                      ('Localizer', Localizer),
+                     #('Localizer', Localizer), # Gauss2D localizer
+                     ('Localizer', SimpleLocalizer), # S/N weighted
                      # ('KnownSourceSifter', KnownSourceSifter),
                      # ('DMChecker', DMChecker),
                      # ('FluxEstimator', FluxEstimator),
@@ -698,6 +550,7 @@ if __name__ == '__main__':
     export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/
     '''
 
+    
     from frb_common import pipeline_tools
     #from frb_L2_L3.actors.localizer import Localizer
 
@@ -709,23 +562,26 @@ if __name__ == '__main__':
     with importlib.resources.as_file(config) as config_path:
         pipeline_tools.load_configuration(config_path)
     bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
-    
-    #name,clz = ('Localizer', Localizer)
-    #conf = pipeline_tools.get_worker_configuration(name)
-    #print('Got localizer config:', conf)
-    #conf.pop('io')
-    #conf.pop('log')
-    #picl = conf.pop('use_pickle')
-    #conf.pop('timeout')
-    #conf.pop('periodic_update')
-    #p = clz(**conf)
-    #print('Got Localizer:', p)
 
-    # from frb_L2_L3.actors.localizer import lookup
+    if False:
+        #from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+        from frb_L2_L3.actors.rfi_sifter import RFISifter
     
-    #sys.exit(0)
+        #name,clz = ('Localizer', Localizer)
+        name,clz = ('RFISifter', RFISifter)
+        conf = pipeline_tools.get_worker_configuration(name)
+        print('Got actor config:', conf)
+        conf.pop('io')
+        conf.pop('log')
+        picl = conf.pop('use_pickle')
+        conf.pop('timeout')
+        conf.pop('periodic_update')
+        p = clz(**conf)
+        print('Got actor:', p)
     
-    
+        # from frb_L2_L3.actors.localizer import lookup
+        
+        sys.exit(0)
     
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session

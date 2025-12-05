@@ -55,7 +55,11 @@ def create_l2_event(l1_events, **kwargs):
             best_snr = snr
             best_event = e
     l1_events = keep
+    # FIXME - this is silly
     l2_event = best_event.copy()
+    for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
+        l2_event['max_' + k] = best_event[k]
+        del l2_event[k]
     #
     l2_event.update(kwargs)
     l2_event['l1_events'] = l1_events

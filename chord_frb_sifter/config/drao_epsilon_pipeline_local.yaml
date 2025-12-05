@@ -76,10 +76,10 @@ specifics:
         filters:                  # list; definitions of filters to be used, format
                                   #       is 'filter_name', dict
                                   #       with kwargs.
-            - ['ML_Classifier_Ensemble', {clf_filename: "/data/rfi_sifter/XGBoost_model.pkl", labels_filename: "/data/rfi_sifter/XGBoost_model.yaml", clf_scaler: "/data/rfi_sifter/scaler.pkl", svm_filename: "/data/rfi_sifter/20190322_python3.pkl", svm_labels_filename: "/data/rfi_sifter/20190322.pkl_labels.yaml"}]
+            # - ['ML_Classifier_Ensemble', {clf_filename: "/data/rfi_sifter/XGBoost_model.pkl", labels_filename: "/data/rfi_sifter/XGBoost_model.yaml", clf_scaler: "/data/rfi_sifter/scaler.pkl", svm_filename: "/data/rfi_sifter/20190322_python3.pkl", svm_labels_filename: "/data/rfi_sifter/20190322.pkl_labels.yaml"}]
+            - ['ML_Classifier', {clf_filename: "/data/rfi_sifter/20250208_classifier.pkl", labels_filename: "/data/rfi_sifter/20250208_labels.yaml"}]
             - ['High_SNR_Override', {snr_threshold: 100.0, only_coherent: true}]
         io: ['+ipc://EventMaker_b', '+ipc://RFISifter_a']
-
 
     Localizer:
         test_nchan: 64              # int; number of channels to use for fits
