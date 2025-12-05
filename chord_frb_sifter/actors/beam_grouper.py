@@ -177,7 +177,7 @@ class BeamGrouper(Actor):
         tdmxy /= self.thresholds
 
         tree = cKDTree(tdmxy)
-        neighbors = tree.query_ball_tree(tree, r=1.0, p=np.infty)
+        neighbors = tree.query_ball_tree(tree, r=1.0, p=np.inf)
 
         groups = {}
         visiting = []
