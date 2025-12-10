@@ -354,12 +354,14 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
     from chord_frb_sifter.actors.localizer import Localizer
     from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
+    from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
                      # ('RFISifter', RFISifter),
+                     ("BrightPulsarSifter", BrightPulsarSifter),
                      #('Localizer', Localizer), # Gauss2D localizer
                      ('Localizer', SimpleLocalizer), # S/N weighted
                      # ('KnownSourceSifter', KnownSourceSifter),
