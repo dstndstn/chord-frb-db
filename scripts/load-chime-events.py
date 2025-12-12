@@ -381,7 +381,7 @@ def simple_create_pipeline():
 
 #def simple_process_events(pipeline, fpga, beam, events):
 def simple_process_events(pipeline, events):
-    #print('events:', type(events), events)
+    print('events:', type(events), events)
 
     from event import L1Event 
     events = L1Event(events) # turn list into L1Event array

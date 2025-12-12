@@ -17,7 +17,7 @@ def get_L1Event_dtype():
     nds = [1, 2, 4, 8, 16]
     nbeta = 2
 
-    # The dtype from the saved L1b triggers:
+    # The dtype from the saved L1b triggers from fits files:
     #dtype([
     # ('frame0_nano', '>i8'), 
     # ('beam', '>i8'), 
@@ -39,13 +39,14 @@ def get_L1Event_dtype():
     # ('snr_vs_tree_index', '>f4', (5,)), 
     # ('snr_vs_spectral_index', '>f4', (2,))]
 
-    # so far for the CHIME-event testbed just use the base (i.e whats from L1b) 
-    # fields?
+    # These are fields that Dustin has in the list of dicts l1 events
     l1_dtype = np.dtype([
-        ("beam_no", np.uint16),
-        ("timestamp_utc", "datetime64[us]"),
+        ("beam", np.uint16),
+        ("timestamp_utc", np.float64),
         ("timestamp_fpga", np.uint64),
+        ("frame0_nano", np.uint64),
         ("chunk_fpga", np.uint64),
+        ("chunk_utc", np.float64),
         ("tree_index", np.uint8),
         ("snr", np.float32),
         ("snr_scale", np.float32),
@@ -59,6 +60,12 @@ def get_L1Event_dtype():
         ("snr_vs_dm", np.float32, 17),
         ("snr_vs_tree_index", np.float32, len(nds)),
         ("snr_vs_spectral_index", np.float32, nbeta),
+        ("beam_grid_x", np.float32),
+        ("beam_grid_y", np.float32),
+        ("beam_dra", np.float32),
+        ("beam_ddec", np.float32),
+        ("pipeline_timestamp", np.float32),
+        ("pipeline_id", np.uint64),
     ])
 
     return l1_dtype
@@ -69,10 +76,18 @@ class L1Event(np.recarray):
     """
     def __new__(cls, input_array):
 
-        # Casts the input as a numpy recarray with the L1Event dtype
-        # May want to add other ways to create?
-        obj = np.asarray(input_array,dtype=get_L1Event_dtype()).view(cls)
-        return obj
+        # hack for list of dicts (not sure if we want to support long-term though).
+        if isinstance(input_array, list) and isinstance(input_array[0], dict):
+            array = np.zeros(len(input_array),dtype=get_L1Event_dtype())
+            for k in input_array[0].keys():
+                array[k] = [item[k] for item in input_array]
+
+        else:
+            # Casts the input as a numpy recarray with the L1Event dtype
+            # May want to add other ways to create?
+            array = np.asarray(input_array,dtype=get_L1Event_dtype())
+        return array.view(cls)
+
 
 class L2Event(dict):
     __getattr__ = dict.get

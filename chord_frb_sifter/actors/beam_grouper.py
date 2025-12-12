@@ -21,6 +21,7 @@ import msgpack
 #from frb_common.events import L1Event
 
 from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter.event import L2Event
 
 __author__ = "CHIME FRB Group"
 __developers__ = "Alex Josephy"
@@ -29,6 +30,7 @@ __email__ = "alexander.josephy@mail.mcgill.ca"
 # This incorporates steps that used to be in the EventMaker actor.
 def create_l2_event(l1_events, **kwargs):
     print('Creating L2 event from L1 events:')
+    print("l1_events type:",type(l1_events),type(l1_events[0]))
     for e in l1_events:
         print('  ', e)
     from collections import Counter
@@ -56,7 +58,7 @@ def create_l2_event(l1_events, **kwargs):
             best_event = e
     l1_events = keep
     # FIXME - this is silly
-    l2_event = best_event.copy()
+    l2_event = L2Event({name: best_event[name] for name in best_event.dtype.names})
     for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
         l2_event['max_' + k] = best_event[k]
         del l2_event[k]
