@@ -45,6 +45,7 @@ def get_L1Event_dtype():
         ("beam_no", np.uint16),
         ("timestamp_utc", "datetime64[us]"),
         ("timestamp_fpga", np.uint64),
+        ("chunk_fpga", np.uint64),
         ("tree_index", np.uint8),
         ("snr", np.float32),
         ("snr_scale", np.float32),
@@ -67,6 +68,9 @@ class L1Event(np.recarray):
     A class representing an L1 event, inheriting from numpy recarray.
     """
     def __new__(cls, input_array):
+
+        # Casts the input as a numpy recarray with the L1Event dtype
+        # May want to add other ways to create?
         obj = np.asarray(input_array,dtype=get_L1Event_dtype()).view(cls)
         return obj
 

@@ -383,6 +383,9 @@ def simple_create_pipeline():
 def simple_process_events(pipeline, events):
     #print('events:', type(events), events)
 
+    from event import L1Event 
+    events = L1Event(events) # turn list into L1Event array
+
     input_events = [events]
     output_events = []
     for actor in pipeline:
