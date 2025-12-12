@@ -35,7 +35,7 @@ class BrightPulsarSifter(Actor):
 
         conf = yaml.load(open(os.path.join(
             os.path.dirname(__file__), 
-            'config', 
+            '../config', 
             'testChordTelescope.yaml'
         ),'r'), Loader=yaml.Loader)
         self.tele = Chord(conf["telescope"])
@@ -57,7 +57,7 @@ class BrightPulsarSifter(Actor):
             )
         lst = Time(t, scale='utc', location=loc).sidereal_time('apparent').hour
 
-        for pulsar, params in self.known_pulsars.items():
+        for pulsar, params in self.bright_pulsars.items():
             ha = lst - params['ra']
             ha = (ha + 12) % 24 - 12 # wrap HA
 
@@ -65,7 +65,7 @@ class BrightPulsarSifter(Actor):
                 if abs(dm - params['dm']) < params['dm_tol']:
                     event['is_bright_pulsar'] = True
                     event['bright_pulsar_name'] = pulsar
-                    return event
+                    return [event]
 
         event['is_bright_pulsar'] = False
-        return event
+        return [event]
