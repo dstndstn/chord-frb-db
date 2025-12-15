@@ -42,6 +42,7 @@ def get_L1Event_dtype():
     # These are fields that Dustin has in the list of dicts l1 events
     l1_dtype = np.dtype([
         ("beam", np.uint16),
+        ("beam_no", np.uint16), # silly to have dupe!!
         ("timestamp_utc", np.float64),
         ("timestamp_fpga", np.uint64),
         ("frame0_nano", np.uint64),
@@ -66,6 +67,7 @@ def get_L1Event_dtype():
         ("beam_ddec", np.float32),
         ("pipeline_timestamp", np.float32),
         ("pipeline_id", np.uint64),
+        ("is_incoherent", np.bool),
     ])
 
     return l1_dtype
@@ -88,8 +90,21 @@ class L1Event(np.recarray):
             array = np.asarray(input_array,dtype=get_L1Event_dtype())
         return array.view(cls)
 
-
 class L2Event(dict):
-    __getattr__ = dict.get
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
+
+    _reserved = set(dir(dict))
+
+    def __getattr__(self, name):
+        if name in self._reserved:
+            return super().__getattribute__(name)
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_") or name in self._reserved:
+            raise AttributeError(f"'{name}' is reserved")
+        self[name] = value

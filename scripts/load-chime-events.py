@@ -355,12 +355,13 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.localizer import Localizer
     from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
     from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
+    from frb_L2_L3.actors.rfi_sifter import RFISifter
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
                      ('BeamGrouper', BeamGrouper),
                      # ('EventMaker', EventMaker),
-                     # ('RFISifter', RFISifter),
+                     ('RFISifter', RFISifter),
                      ("BrightPulsarSifter", BrightPulsarSifter),
                      #('Localizer', Localizer), # Gauss2D localizer
                      ('Localizer', SimpleLocalizer), # S/N weighted
@@ -382,9 +383,6 @@ def simple_create_pipeline():
 #def simple_process_events(pipeline, fpga, beam, events):
 def simple_process_events(pipeline, events):
     print('events:', type(events), events)
-
-    from event import L1Event 
-    events = L1Event(events) # turn list into L1Event array
 
     input_events = [events]
     output_events = []
@@ -500,6 +498,8 @@ def simple_process_events_file(engine, pipeline, fn,
             for e in beam_events:
                 e['beam_dra'] = dr
                 e['beam_ddec'] = dd
+            for e in beam_events:
+                e['is_incoherent'] = False
 
             #print('beam_events:', beam_events)
 
@@ -544,6 +544,7 @@ def simple_read_fits_events(fn):
         e['timestamp_utc'] = e['frame0_nano']/1000. + e['timestamp_fpga'] * 2.56
         # For completeness, also compute the chunk timestamp in UTC.
         e['chunk_utc'] = e['frame0_nano']/1000. + e['chunk_fpga'] * 2.56
+        e['beam_no'] = e['beam'] # duplication beam for RFISifter...
 
     print('Event keys:', eventlist[0].keys())
     return fpgas,beams,eventlist
