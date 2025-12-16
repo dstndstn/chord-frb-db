@@ -25,7 +25,10 @@ class Chord(Telescope):
 
         self.origin_itrs_lon_deg = conf.get('origin_itrs_lon_deg', 0.0)
         self.origin_itrs_lat_deg = conf.get('origin_itrs_lat_deg', 0.0)
-        #self.dish_coelev_deg = conf.get('dish_coelev_deg', 0.0)
+        # 0 deg: dishes are pointing straight up.  +: pointing north.
+        self.dish_coelev_deg = conf.get('dish_coelev_deg', 0.0)
+        # FIXME... need to implement things like
+        # https://github.com/kotekan/kotekan/blob/chord/lib/utils/CHORDTelescope.cpp#L522
         print('Config file: lat/long', self.origin_itrs_lat_deg, self.origin_itrs_lon_deg, 'deg')
         self.location = EarthLocation(lat=self.origin_itrs_lat_deg * u.deg,
                                       lon=self.origin_itrs_lon_deg * u.deg)
@@ -102,6 +105,8 @@ if __name__ == '__main__':
                           'r'), Loader=Loader)
     tele = conf['telescope']
     chord = Chord(tele)
+
+    print('Dish coelevation:', chord.dish_coelev_deg, 'deg')
 
     for x,y in [(0., 0.),
                 (0., 1.),
