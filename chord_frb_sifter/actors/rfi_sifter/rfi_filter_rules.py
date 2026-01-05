@@ -120,7 +120,7 @@ class ML_Classifier(object):
             features_to_vector(features, self.labels).reshape(1, self.n_labels)
         )[0, 1]
 
-        if isinstance(
+        if hasattr(event,"rfi_grade_level2") and isinstance(
             event.rfi_grade_level2, (float, int)
         ):  # Some grade already exists
             event.rfi_grade_level2 = event.rfi_grade_level2 * grade
@@ -130,11 +130,11 @@ class ML_Classifier(object):
         print(event.rfi_grade_level2)
         # add to the dictionary (grade_metrics)
         # if the keys already exist then they are updated.
-        if isinstance(event.rfi_grade_metrics_level2, dict):
+        if hasattr(event,"rfi_grade_metrics_level2") and isinstance(event.rfi_grade_metrics_level2, dict):
             event.rfi_grade_metrics_level2.update({"ML_Classifier_grade": grade})
         else:
             event.rfi_grade_metrics_level2 = {"ML_Classifier_grade": grade}
-        event.futures.rfi_features = features
+        #event.futures.rfi_features = features
 
         return event
 
@@ -247,7 +247,7 @@ class ML_Classifier_Ensemble(object):
             import traceback; traceback.print_exc()
 
         print(f"sucessfully graded: {grade}")
-        if isinstance(
+        if hasattr(event,"rfi_grade_level2") and isinstance(
             event.rfi_grade_level2, (float, int)
         ):  # Some grade already exists
             if event.rfi_grade_level2!=10:
@@ -259,7 +259,7 @@ class ML_Classifier_Ensemble(object):
 
         # add to the dictionary (grade_metrics)
         # if the keys already exist then they are updated.
-        if isinstance(event.rfi_grade_metrics_level2, dict):
+        if hasattr(event,"rfi_grade_metrics_level2") and isinstance(event.rfi_grade_metrics_level2, dict):
             event.rfi_grade_metrics_level2.update({"ML_Classifier_grade": grade})
         else:
             event.rfi_grade_metrics_level2 = {"ML_Classifier_grade": grade}
@@ -397,7 +397,7 @@ class AntiCoincidence(object):
         ## do stuff to calculate a grade
         grade = 1.0
 
-        if isinstance(event.rfi_grade_level2, (float, int)) and (
+        if hasattr(event,"rfi_grade_level2") and isinstance(event.rfi_grade_level2, (float, int)) and (
             event.rfi_grade_level2 > 0
         ):
             # Some grade already exists
@@ -407,7 +407,7 @@ class AntiCoincidence(object):
 
         # add to the dictionary (grade_metrics)
         # if the keys already exist then they are updated.
-        if isinstance(event.rfi_grade_metrics_level2, dict):
+        if hasattr(event,"rfi_grade_metrics_level2") and isinstance(event.rfi_grade_metrics_level2, dict):
             event.rfi_grade_metrics_level2.update(
                 {"anti_coincidence" + "_grade": grade}
             )
@@ -490,7 +490,7 @@ class High_SNR_Override(object):
 
             # add to the dictionary (grade_metrics)
             # if the keys already exist then they are updated.
-            if isinstance(event.rfi_grade_metrics_level2, dict):
+            if hasattr(event,"rfi_grade_metrics_level2") and isinstance(event.rfi_grade_metrics_level2, dict):
                 event.rfi_grade_metrics_level2.update({"High_SNR_Override_grade": 10.0})
             else:
                 event.rfi_grade_metrics_level2 = {"High_SNR_Override_grade": 10.0}
@@ -555,7 +555,7 @@ class Sanity_Check(object):
 
             # add to the dictionary (grade_metrics)
             # if the keys already exist then they are updated.
-            if isinstance(event.rfi_grade_metrics_level2, dict):
+            if hasattr(event,"rfi_grade_metrics_level2") and isinstance(event.rfi_grade_metrics_level2, dict):
                 event.rfi_grade_metrics_level2.update({"Sanity_Check_grade": 0.0})
             else:
                 event.rfi_grade_metrics_level2 = {"Sanity_Check_grade": 0.0}
