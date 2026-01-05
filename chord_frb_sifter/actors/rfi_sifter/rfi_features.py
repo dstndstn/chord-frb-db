@@ -87,34 +87,34 @@ except:
 
 
 L1_FEATURE_DTYPE = [
-    ("max_coherent_snr", np.float),
-    ("incoherent_snr", np.float),
-    ("max_to_second_snr_ratio", np.float),
-    ("max_level1_grade", np.float),
-    ("mean_level1_grade", np.float),
-    ("snr_weighted_level1_grade", np.float),
-    ("snr_weighted_tree_index_weighted_level1_grade", np.float),
-    ("std_level1_grade", np.float),
-    ("min_tree_index", np.int),
-    ("mean_tree_index", np.float),
-    ("snr_weighted_tree_index", np.float),
-    ("snr_vs_dm", np.float),
-    ("std_tree_index", np.int),
-    ("ew_extent", np.int),
-    ("ns_extent", np.int),
-    ("group_density", np.float),
-    ("max_snr_ns_beam", np.int),
-    ("snr", np.float),
+    ("max_coherent_snr", float),
+    ("incoherent_snr", float),
+    ("max_to_second_snr_ratio", float),
+    ("max_level1_grade", float),
+    ("mean_level1_grade", float),
+    ("snr_weighted_level1_grade", float),
+    ("snr_weighted_tree_index_weighted_level1_grade", float),
+    ("std_level1_grade", float),
+    ("min_tree_index", int),
+    ("mean_tree_index", float),
+    ("snr_weighted_tree_index", float),
+    ("snr_vs_dm", float),
+    ("std_tree_index", int),
+    ("ew_extent", int),
+    ("ns_extent", int),
+    ("group_density", float),
+    ("max_snr_ns_beam", int),
+    ("snr", float),
 ]
 
 FULL_FEATURE_DTYPE = L1_FEATURE_DTYPE + [
-    ("beam_activity", np.float),
-    ("coh_dm_activity", np.float),
-    ("incoh_dm_activity", np.float),
-    ("avg_l1_grade", np.float),
-    ("event_no", np.int),
+    ("beam_activity", float),
+    ("coh_dm_activity", float),
+    ("incoh_dm_activity", float),
+    ("avg_l1_grade", float),
+    ("event_no", int),
     ("time", dt),
-    ("dm", np.float),
+    ("dm", float),
 ]
 
 
@@ -163,7 +163,7 @@ def features_to_vector(features_vector, label_list):
     """
     n_samples = len(features_vector)
     n_features = len(label_list)
-    ret = np.zeros((n_samples, n_features), dtype=np.float)
+    ret = np.zeros((n_samples, n_features), dtype=float)
 
     for i in range(n_features):
         ret[:, i] = features_vector[label_list[i]].astype(float)
@@ -213,13 +213,13 @@ def event_to_features(event, event_no=None, return_y=False):
     num_dead_beams = len(event.dead_beam_nos)
     num_active_beams = 1021 - num_dead_beams
 
-    ret["beam_activity"] = np.float(event.beam_activity) / (num_active_beams)
-    if hasattr(event.futures, "coh_dm_activity"):
-        ret["coh_dm_activity"] = np.float(event.futures.coh_dm_activity)
-    if hasattr(event.futures, "incoh_dm_activity"):
-        ret["incoh_dm_activity"] = np.float(event.futures.incoh_dm_activity)
-    if hasattr(event.futures, "avg_l1_grade"):
-        ret["avg_l1_grade"] = np.float(event.futures.avg_l1_grade)
+    ret["beam_activity"] = float(event.beam_activity) / (num_active_beams)
+    if hasattr(event, "dm_activity"):
+        ret["coh_dm_activity"] = float(event.dm_activity)
+    #if hasattr(event.futures, "incoh_dm_activity"): # don't have this in CHORD L2event!
+    #    ret["incoh_dm_activity"] = float(event.futures.incoh_dm_activity)
+    if hasattr(event, "avg_l1_grade"):
+        ret["avg_l1_grade"] = float(event.avg_l1_grade)
 
     l1_events = event.l1_events
 
@@ -281,7 +281,7 @@ def db_to_features(event_no, return_y=False):
 
     num_dead_beams = get_dead_beams(event_no)
     num_active_beams = 1021 - num_dead_beams
-    ret["beam_activity"] = np.float(event.beam_activity) / (num_active_beams)
+    ret["beam_activity"] = float(event.beam_activity) / (num_active_beams)
     ret["coh_dm_activity"], ret["incoh_dm_activity"], ret["avg_l1_grade"] = get_dm_activity(
         event.timestamp_utc,
         event_no=event_no
@@ -410,7 +410,7 @@ def get_l1_events(event):
 
     """
     l1_args = ["beam_no", "snr", "rfi_grade_level1", "tree_index", "is_incoherent"]
-    l1_args_types = [np.int, np.float, np.float, np.int, bool]
+    l1_args_types = [int, float, float, int, bool]
 
     l1_args_dtype = list(zip(l1_args, l1_args_types))
     l1_events = np.core.records.fromrecords(
@@ -539,7 +539,7 @@ def get_l1_features(l1_events):
         ret["ns_extent"] = np.max(ns_beams) - np.min(ns_beams)
         ret["ew_extent"] = np.max(ew_beams) - np.min(ew_beams)
         ret["group_density"] = (
-            np.float(len(l1_events)) / (ret["ns_extent"] + 1) / (ret["ew_extent"] + 1)
+            float(len(l1_events)) / (ret["ns_extent"] + 1) / (ret["ew_extent"] + 1)
         )
         ret["max_snr_ns_beam"] = ns_beams[snr_sort[-1]]
 
