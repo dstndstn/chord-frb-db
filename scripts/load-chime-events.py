@@ -355,7 +355,7 @@ def simple_create_pipeline():
     from chord_frb_sifter.actors.localizer import Localizer
     from chord_frb_sifter.actors.simple_localizer import SimpleLocalizer
     from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
-    from frb_L2_L3.actors.rfi_sifter import RFISifter
+    from chord_frb_sifter.actors.rfi_sifter import RFISifter
 
     pipeline = []
     for name,clz in [('BeamBuffer', BeamBuffer),
