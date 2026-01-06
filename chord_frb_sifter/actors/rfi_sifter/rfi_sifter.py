@@ -94,6 +94,9 @@ class RFISifter(Actor):
 
             print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
 
+            # For now if its not RFI say its unknown (KSS can change later)
+            event.event_category = 1
+
             return [event]
 
     def load_filters(self, filters):

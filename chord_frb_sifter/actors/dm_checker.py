@@ -80,13 +80,15 @@ class DMChecker(Actor):
         statistically ambiguous.
         """
 
+        print("DM CHECKER DEBUG:",type(event),event)
+
         # RFI or known source -- don't perform DM check.
         if event.event_category in [2,3]:
             return [event]
 
         # convert copy of input RA/DEC to Galactic coordinates.
-        right_ascension = event.pos_ra_deg
-        declination = event.pos_dec_deg
+        right_ascension = event.ra
+        declination = event.dec
         dm_measured = event.dm
         dm_uncertainty = event.dm_error
 
