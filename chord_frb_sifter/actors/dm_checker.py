@@ -80,10 +80,11 @@ class DMChecker(Actor):
         statistically ambiguous.
         """
 
-        print("DM CHECKER DEBUG:",type(event),event)
-
         # RFI or known source -- don't perform DM check.
-        if event.event_category in [2,3]:
+        if (
+            (hasattr(event,"is_rfi") and event.is_rfi)
+            or (hasattr(event,"is_known_source") and event.is_known_source)
+        ):
             return [event]
 
         # convert copy of input RA/DEC to Galactic coordinates.
