@@ -545,7 +545,6 @@ def simple_read_fits_events(fn):
         e['timestamp_utc'] = e['frame0_nano']/1000. + e['timestamp_fpga'] * 2.56
         # For completeness, also compute the chunk timestamp in UTC.
         e['chunk_utc'] = e['frame0_nano']/1000. + e['chunk_fpga'] * 2.56
-        e['beam_no'] = e['beam'] # duplication beam for RFISifter...
 
     print('Event keys:', eventlist[0].keys())
     return fpgas,beams,eventlist

@@ -42,7 +42,6 @@ def get_L1Event_dtype():
     # These are fields that Dustin has in the list of dicts l1 events
     l1_dtype = np.dtype([
         ("beam", np.uint16),
-        ("beam_no", np.uint16), # silly to have dupe!!
         ("timestamp_utc", np.float64),
         ("timestamp_fpga", np.uint64),
         ("frame0_nano", np.uint64),

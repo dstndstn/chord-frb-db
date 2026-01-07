@@ -210,7 +210,7 @@ def event_to_features(event, event_no=None, return_y=False):
     ret["dm"] = event.dm
     ret["time"] = event.timestamp_utc
 
-    num_dead_beams = len(event.dead_beam_nos)
+    num_dead_beams = len(event.dead_beams)
     num_active_beams = 1021 - num_dead_beams
 
     ret["beam_activity"] = float(event.beam_activity) / (num_active_beams)
@@ -409,7 +409,7 @@ def get_l1_events(event):
     l1_events : np.recarray
 
     """
-    l1_args = ["beam_no", "snr", "rfi_grade_level1", "tree_index", "is_incoherent"]
+    l1_args = ["beam", "snr", "rfi_grade_level1", "tree_index", "is_incoherent"]
     l1_args_types = [int, float, float, int, bool]
 
     l1_args_dtype = list(zip(l1_args, l1_args_types))
@@ -510,7 +510,7 @@ def get_l1_features(l1_events):
 
         l1_events = l1_events[np.where(l1_events["is_incoherent"] == False)]
 
-        beam_nos = l1_events["beam_no"]
+        beam_nos = l1_events["beam"]
         snr_sort = np.argsort(l1_events["snr"])
 
         ret["max_coherent_snr"] = l1_events["snr"][snr_sort[-1]]
@@ -534,8 +534,8 @@ def get_l1_features(l1_events):
         )
         ret["std_tree_index"] = np.std(l1_events["tree_index"])
         ret["snr_weighted_tree_index_weighted_level1_grade"] = [ret["snr_weighted_level1_grade"][0]/ tree_weight.get(ret["min_tree_index"][0])]
-        ns_beams = l1_events["beam_no"] % 1000
-        ew_beams = l1_events["beam_no"] // 1000
+        ns_beams = l1_events["beam"] % 1000
+        ew_beams = l1_events["beam"] // 1000
         ret["ns_extent"] = np.max(ns_beams) - np.min(ns_beams)
         ret["ew_extent"] = np.max(ew_beams) - np.min(ew_beams)
         ret["group_density"] = (

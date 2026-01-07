@@ -143,7 +143,7 @@ class BeamGrouper(Actor):
         print('First event:', events[0])
         groups = self._cluster(events)
 
-        dead_beam_nos = [] # Needed for CHIME RFISifter, will probably want for CHORD, but likely won't come from L1 per event.
+        dead_beams = [] # Needed for CHIME RFISifter, will probably want for CHORD, but likely won't come from L1 per event.
         beam_activity = len(set([e['beam'] for e in events]))
         dm_activity = len(set([e['dm'] for e in events]))
         avg_l1_grade = np.mean([e['rfi_grade_level1'] for e in events])
@@ -169,7 +169,7 @@ class BeamGrouper(Actor):
                                        beam_activity_lookback=self.beam_activity_lookback,
                                        dm_activity_lookback=self.dm_activity_lookback,
                                        avg_l1_grade=avg_l1_grade,
-                                       dead_beam_nos=dead_beam_nos,
+                                       dead_beams=dead_beams,
                                        )
             l2_events.append(l2_event)
         return l2_events
