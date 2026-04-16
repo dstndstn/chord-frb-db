@@ -72,6 +72,17 @@ def get_L1Event_dtype():
     return l1_dtype
 
 
+def simulate_l2_event():
+    """Returns a minimal L2Event for smoke-testing pipeline actors."""
+    fake_l1 = np.zeros(3, dtype=get_L1Event_dtype()).view(L1Event)
+    fake_l1['snr'] = [10.0, 8.0, 6.0]
+    fake_l1['dm'] = 100.0
+    fake_l1['tree_index'] = 2
+    fake_l1['beam'] = [0, 1, 2]
+    return L2Event({'dm': 100.0, 'timestamp_utc': 0.0, 'beam_activity': 10,
+                    'dead_beams': [], 'l1_events': fake_l1})
+
+
 class L1Event(np.recarray):
     """
     A class representing an L1 event, inheriting from numpy recarray.

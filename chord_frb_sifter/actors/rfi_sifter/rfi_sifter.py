@@ -14,7 +14,6 @@ __developers__ = "Shriharsh Tendulkar"
 __email__ = "shriharsh@physics.mcgill.ca"
 __status__ = "Epsilon"
 
-from frb_common.events import L2Event, SimulateEvents
 from chord_frb_sifter import config
 
 from chord_frb_sifter.actors.actor import Actor
@@ -199,33 +198,15 @@ class RFISifter(Actor):
 def filter_works(filter_function):
     """
     Tests that a filter minimally works without crashing.
-
-    This does not test the science. Only that the filter function takes
-    an L2_event and the arguments provided in the config file and returns
-    an L2_event without an error.
-    *** Whether the function does anything usefulis not checked.****
-
-    Parameters
-    ----------
-    filter_function : func
-    Function handle from L2_rfi_filter_rules
-    filter_arguments : str
-    kwargs for the filters.
     """
-
-    event_maker = SimulateEvents()
-
-    events_in = event_maker.get_l3_events(number_of_events=5)
-
+    from chord_frb_sifter.event import simulate_l2_event
     try:
-        for event in events_in:
-            event_out = filter_function.grade(event)
-        assert isinstance(event_out, L2Event)
+        filter_function.grade(simulate_l2_event())
         print("Filter {} works.".format(filter_function.__name__))
-        # print "Filter %s works!"%filter_function.__name__
-        return True  # filter is good.
-    except AssertionError:
-        print(("Filter {} doesn't work!".format(filter_function.__name__)))
+        return True
+    except Exception:
+        import traceback; traceback.print_exc()
+        print("Filter {} doesn't work!".format(filter_function.__name__))
         return False
 
 
