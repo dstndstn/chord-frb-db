@@ -8,7 +8,6 @@ import fitsio
 
 from copy import deepcopy
 
-from frb_common.events.l1_event.dtypes import L1_EVENT_DTYPE
 import cfbm
 
 from chord_frb_db.utils import get_db_engine
@@ -212,13 +211,10 @@ def send_to_db(session, events):
         session.commit()
 
 def setup():
-    from frb_common.events import L1Event
     from chord_frb_sifter import config
     config.load_actor_configuration()
     config.load_bonsai_config()
     config.load_telescope_config()
-    bonsai_config = config.l1_config
-    L1Event.use_bonsai_config(bonsai_config)
                 
 # These are our simplified CHORD pipeline actors.
 # A "pipeline" here is just a list of actors.
@@ -423,7 +419,7 @@ def simple_read_fits_events(fn):
 
 if __name__ == '__main__':
     '''
-    export PYTHONPATH=${PYTHONPATH}:../frb_common/:../frb-l2l3/
+    export PYTHONPATH=${PYTHONPATH}:../chord-frb-sifter/
     '''
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
