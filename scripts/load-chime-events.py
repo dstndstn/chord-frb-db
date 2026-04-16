@@ -212,22 +212,18 @@ def send_to_db(session, events):
         session.commit()
 
 def setup():
-    from frb_common import pipeline_tools
     from frb_common.events import L1Event
-    import importlib.resources
-    # all pipeline behaviour is encoded in config file
-    configfn = 'drao_epsilon_pipeline_local.yaml'
-    config = importlib.resources.files('chord_frb_sifter.config').joinpath(configfn)
-    with importlib.resources.as_file(config) as config_path:
-        pipeline_tools.load_configuration(config_path)
-    bonsai_config = pipeline_tools.config["generics"]["bonsai_config"]
+    from chord_frb_sifter import config
+    config.load_actor_configuration()
+    config.load_bonsai_config()
+    config.load_telescope_config()
+    bonsai_config = config.l1_config
     L1Event.use_bonsai_config(bonsai_config)
                 
 # These are our simplified CHORD pipeline actors.
 # A "pipeline" here is just a list of actors.
 def simple_create_pipeline(database_engine):
-    # Still reusing some of the config stuff... can probably simplify this too!!
-    from frb_common import pipeline_tools
+    from chord_frb_sifter import config
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
@@ -253,7 +249,7 @@ def simple_create_pipeline(database_engine):
                      # ('FluxEstimator', FluxEstimator),
                      ('ActionPicker', ActionPicker),
                      ]:
-        conf = pipeline_tools.get_worker_configuration(name)
+        conf = config.get_worker_configuration(name)
         conf.pop('io')
         conf.pop('log')
         picl = conf.pop('use_pickle')

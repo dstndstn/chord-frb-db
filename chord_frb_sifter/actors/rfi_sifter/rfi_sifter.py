@@ -15,7 +15,7 @@ __email__ = "shriharsh@physics.mcgill.ca"
 __status__ = "Epsilon"
 
 from frb_common.events import L2Event, SimulateEvents
-from frb_L2_L3 import config_dir
+from chord_frb_sifter import config
 
 from chord_frb_sifter.actors.actor import Actor
 
@@ -122,7 +122,7 @@ class RFISifter(Actor):
         for i, filt in enumerate(filters):
             # check if this filter definition exists
             if hasattr(rfi_filter_rules, filt[0]):
-                filt[1].update({"config_dir": config_dir})
+                filt[1].update({"config_dir": config.config_dir})
                 try:
                     # test out the function
                     # func =getattr(rfi_filter_rules, filt[0])(filt[1])

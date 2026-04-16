@@ -9,28 +9,12 @@ class attributes.
 """
 
 import numpy as np
-
-def load_bonsai_config(configfn = 'bonsai_production_fixed_coarse_graining_hybrid_0.8_0.015.txt'):
-    from pathlib import Path
-    from importlib.util import module_from_spec, spec_from_loader
-    from importlib.machinery import SourceFileLoader
-    
-    path = Path(__file__).parent / "config" / configfn
-
-    spec = spec_from_loader("bonsai_cfg", SourceFileLoader("bonsai_cfg", str(path)))
-    bonsai_cfg = module_from_spec(spec)
-    spec.loader.exec_module(bonsai_cfg)
-
-    return bonsai_cfg
-
-L1_config = load_bonsai_config()
+from chord_frb_sifter import config
 
 def get_L1Event_dtype():
 
-    # Hardcoded for now to avoid loading CHIME bonsai config.
-    # Will want to replace with CHORD config loading eventually.
-    nds = L1_config.nds
-    nbeta = L1_config.nbeta
+    nds = config.l1_config.nds
+    nbeta = config.l1_config.nbeta
 
     # The dtype from the saved L1b triggers from fits files:
     #dtype([
@@ -119,22 +103,22 @@ class L1Event(np.recarray):
         #freq_hi_MHz = 800.0
     
         itree = self["tree_index"][0]
-        tree_dt = L1_config.dt_sample * L1_config.nds[itree] / L1_config.nups
+        tree_dt = config.l1_config.dt_sample * config.l1_config.nds[itree] / config.l1_config.nups
     
         tree_max_dm = (
-                (L1_config.tree_size[itree] - 1)
+                (config.l1_config.tree_size[itree] - 1)
                 * tree_dt
-                / (4.148806e3 * (1.0 / L1_config.freq_lo_MHz**2 - 1.0 / L1_config.freq_hi_MHz**2))
+                / (4.148806e3 * (1.0 / config.l1_config.freq_lo_MHz**2 - 1.0 / config.l1_config.freq_hi_MHz**2))
                 )
         
-        return tree_max_dm * L1_config.dm_coarse_graining_factor[itree] / L1_config.tree_size[itree] / 2.0
+        return tree_max_dm * config.l1_config.dm_coarse_graining_factor[itree] / config.l1_config.tree_size[itree] / 2.0
 
     def get_time_error(self):
 
         itree = self["tree_index"][0]
-        tree_dt = L1_config.dt_sample * L1_config.nds[itree] / L1_config.nups
+        tree_dt = config.l1_config.dt_sample * config.l1_config.nds[itree] / config.l1_config.nups
 
-        return tree_dt * L1_config.dm_coarse_graining_factor[itree] / 2.0
+        return tree_dt * config.l1_config.dm_coarse_graining_factor[itree] / 2.0
 
     def database_payloads(self):
         l1_name_map = {

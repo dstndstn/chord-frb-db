@@ -6,17 +6,13 @@ sidelobes.
 
 from chord_frb_sifter.actors import Actor
 from chord_frb_sifter.chord import Chord
+from chord_frb_sifter import config
 
 import numpy as np
 from datetime import datetime
 
-# import cfbm # Only if using cfbm for LST calculation
-
-# Imports for astropy LST calculation
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
-import yaml
-import os.path
 
 
 class BrightPulsarSifter(Actor):
@@ -34,12 +30,7 @@ class BrightPulsarSifter(Actor):
             # Add more known bright pulsars as needed
         }
 
-        conf = yaml.load(open(os.path.join(
-            os.path.dirname(__file__), 
-            '../config', 
-            'testChordTelescope.yaml'
-        ),'r'), Loader=yaml.Loader)
-        self.tele = Chord(conf["telescope"])
+        self.tele = Chord(config.chord_config["telescope"])
 
     def _perform_action(self, event):
   

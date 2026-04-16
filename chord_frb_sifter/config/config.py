@@ -11,6 +11,7 @@ Store configuration parameters to be used in the chord_sifter pipeline and actor
 # from upstream when pipeline starts (L1 should send it to us)
 # But for CHIME, comes from files now.
 
+import os
 import yaml
 from pathlib import Path
 from importlib.util import module_from_spec, spec_from_loader
@@ -19,6 +20,9 @@ from importlib.machinery import SourceFileLoader
 l1_config = {} # bonsai/pirate configs
 chord_config = {} # telescope configs
 actor_configs = {} # L2/L3 configs
+
+# Directory where config data files (ML models, DM maps, etc.) live
+config_dir = os.path.dirname(__file__)
 
 
 def load_bonsai_config(configfn = 'bonsai_production_fixed_coarse_graining_hybrid_0.8_0.015.txt'):
@@ -55,7 +59,6 @@ def load_actor_configuration(configfn = 'drao_epsilon_pipeline_local.yaml'):
     global actor_configs
     config_file = Path(__file__).parent / configfn
     actor_configs = yaml.safe_load(open(config_file))
-    is_master.value = config.get("node_type", "MASTER").upper() == "MASTER"
 
 # Load CHIME's L2/L3 worker (actor) configs, will replace with CHORD version.
 # For CHORD I don't see why we can't just KISS and load all configs into a 
