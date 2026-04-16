@@ -16,9 +16,10 @@ import yaml
 from pathlib import Path
 from importlib.util import module_from_spec, spec_from_loader
 from importlib.machinery import SourceFileLoader
+from types import SimpleNamespace
 
-l1_config = {} # bonsai/pirate configs
-chord_config = {} # telescope configs
+l1_config = SimpleNamespace() # bonsai/pirate configs
+chord_config = SimpleNamespace() # telescope configs
 actor_configs = {} # L2/L3 configs
 
 # Directory where config data files (ML models, DM maps, etc.) live
@@ -33,8 +34,7 @@ def load_bonsai_config(configfn = 'bonsai_production_fixed_coarse_graining_hybri
     bonsai_cfg = module_from_spec(spec)
     spec.loader.exec_module(bonsai_cfg)
 
-    global l1_config
-    l1_config = bonsai_cfg
+    l1_config.__dict__.update(vars(bonsai_cfg))
 
 # Load upstream config
 def load_telescope_config(configfn = 'testChordTelescope.yaml'):
@@ -42,8 +42,7 @@ def load_telescope_config(configfn = 'testChordTelescope.yaml'):
     path = Path(__file__).parent / configfn
     conf = yaml.load(open(path,'r'), Loader=yaml.Loader)
 
-    global chord_config
-    chord_config = conf
+    chord_config.__dict__.update(conf)
 
 # from frb_common.pipeline_tools
 def load_actor_configuration(configfn = 'drao_epsilon_pipeline_local.yaml'):
@@ -58,7 +57,7 @@ def load_actor_configuration(configfn = 'drao_epsilon_pipeline_local.yaml'):
     """
     global actor_configs
     config_file = Path(__file__).parent / configfn
-    actor_configs = yaml.safe_load(open(config_file))
+    actor_configs.update(yaml.safe_load(open(config_file)))
 
 # Load CHIME's L2/L3 worker (actor) configs, will replace with CHORD version.
 # For CHORD I don't see why we can't just KISS and load all configs into a 

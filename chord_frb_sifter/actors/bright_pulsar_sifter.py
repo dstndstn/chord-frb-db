@@ -30,7 +30,7 @@ class BrightPulsarSifter(Actor):
             # Add more known bright pulsars as needed
         }
 
-        self.tele = Chord(config.chord_config["telescope"])
+        self.tele = Chord(config.chord_config.telescope)
 
     def _perform_action(self, event):
   

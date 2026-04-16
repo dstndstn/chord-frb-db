@@ -79,6 +79,9 @@ def simulate_l2_event():
     fake_l1['dm'] = 100.0
     fake_l1['tree_index'] = 2
     fake_l1['beam'] = [0, 1, 2]
+    # snr_vs_dm needs nonzero values so RFI feature extraction doesn't get an empty array
+    fake_l1['snr_vs_dm'] = np.array([5.0, 6.0, 7.0, 8.0, 9.0, 9.5, 10.0, 9.5, 9.0,
+                                      8.0, 7.0, 6.0, 5.0, 4.5, 4.0, 3.5, 3.0])
     return L2Event({'dm': 100.0, 'timestamp_utc': 0.0, 'beam_activity': 10,
                     'dead_beams': [], 'l1_events': fake_l1})
 
