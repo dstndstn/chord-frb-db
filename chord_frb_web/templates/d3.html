@@ -25,20 +25,57 @@
   
   //const plot = Plot.rectY({length: 10000}, Plot.binX({y: "count"}, {x: Math.random})).plot();
 
+
+  const plot = Plot.plot({
+      title: "Maximum FRB trigger S/N per beam",
+      grid: true,
+      aspectRatio: 1,
+      color: {legend: true},
+      marks: [
+	  Plot.frame(),
+	  Plot.dot({
+	      length: data["beam_x"].length,
+	  }, {
+	      x: data["beam_x"],
+	      y: data["beam_y"],
+	      stroke: data["sn_cg"],
+	  })
+      ],
+  })
+
+  //Plot.lineY({length: linedata.length}, {
+  //    x: linedata.map((d) => d.hour),
+  //    y: linedata.map((d) => d.value),
+  //    stroke: linedata.map((d) => d.sensor)
+  //}).plot()
+
+  
   var transposed = [];
   for (var i=0; i<data["beam_x"].length; i++) {
       transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
   }
   
-  const plot = Plot.plot({
-      grid: true,
-      aspectRatio: 1,
-      color: {legend: true},
-      marks: [
-  	  Plot.frame(),
-	  Plot.dot(transposed, {x: "beam_x", y: "beam_y", stroke: "sn_cg"}),
-      ]
-  });
+  // const plot = Plot.plot({
+  //     // height: 200,
+  // 
+  //     // y axis control:
+  //     // y: {
+  //     // 	  type: "log",
+  //     // 	  domain: [30, 300],
+  //     // 	  grid: true
+  //     // },
+  // 
+  //     title: "Maximum FRB trigger S/N per beam",
+  //     grid: true,
+  //     aspectRatio: 1,
+  //     color: {legend: true},
+  //     marks: [
+  // 	  Plot.frame(),
+  // 	  Plot.dot(transposed, {x: "beam_x", y: "beam_y", stroke: "sn_cg"}),
+  //     ]
+  // });
+  // const color = plot.scale("color"); // get the color scale
+  // console.log(color.range);
   
   const div = document.querySelector("#myplot");
   div.append(plot);
