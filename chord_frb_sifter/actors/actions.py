@@ -77,13 +77,19 @@ class ActionPicker(Actor):
         print('Starting database interaction thread.')
         with Session(database_engine) as session:
             while True:
-                print('Waiting for event from db queue.  Approx size: %i' % self.db_queue.qsize())
-                event = self.db_queue.get()
-                if event is None:
-                    break
-                self.save_event_to_db(session, event)
-                session.flush()
-                session.commit()
+                try:
+                    print('Waiting for event from db queue.  Approx size: %i' % self.db_queue.qsize())
+                    event = self.db_queue.get()
+                    if event is None:
+                        break
+                    self.save_event_to_db(session, event)
+                    session.flush()
+                    session.commit()
+                except Exception as e:
+                    print('Database thread hit exception:', e)
+                    import traceback
+                    traceback.print_exc()
+                    raise e
         print('Database thread ending')
 
     def save_event_to_db(self, session, event):
