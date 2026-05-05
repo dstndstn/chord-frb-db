@@ -38,11 +38,19 @@ for (var i=0; i<data["beam_x"].length; i++) {
     );
 }
 
+var beam_size = []
+for (var i=0; i<data["beam_x"].length; i++) {
+    beam_size.push(
+	5. * Math.sqrt(i / data["beam_x"].length));
+}
+
   const plot = Plot.plot({
       title: "Maximum FRB trigger S/N per beam",
       grid: true,
       aspectRatio: 1,
-      color: {legend: true},
+      color: {legend: true,
+	      scheme: "inferno" },
+      r: {range: [0, 5]},
       marks: [
 	  Plot.frame(),
 	  Plot.dot({
@@ -50,21 +58,26 @@ for (var i=0; i<data["beam_x"].length; i++) {
 	  }, {
 	      x: data["beam_x"],
 	      y: data["beam_y"],
+	      r: beam_size,
 	      //stroke: data["sn_cg"],
 	      fill: data["sn_cg"],
 	      //fillOpacity: 0.5,
 	      //mixBlendMode: "lighten",
 	      //pointerEvents: "fill",
+	      //scheme: "magma",
 	  }),
 	  // red dot that follows the cursor
 	  Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
+	  // tooltip
 	  Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
 								  //filter: (d) => d.info,
 								  //title: func,
 								  title: tooltips,
 								 })),
 	  //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
-								  //sn: data["sn_cg"]})),
+	  //sn: data["sn_cg"]})),
+	  // crosshairs
+	  Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
       ],
   })
 
