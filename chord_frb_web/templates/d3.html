@@ -25,6 +25,18 @@
   
   //const plot = Plot.rectY({length: 10000}, Plot.binX({y: "count"}, {x: Math.random})).plot();
 
+//function func(x) {
+//console.log("func: " + x);
+//}
+
+var tooltips = [];
+for (var i=0; i<data["beam_x"].length; i++) {
+    tooltips.push(
+	"Beam: " + (i+1) + "\n" +
+	"SN: " + data["sn_cg"][i].toFixed(2)
+	//{"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]}
+    );
+}
 
   const plot = Plot.plot({
       title: "Maximum FRB trigger S/N per beam",
@@ -38,8 +50,21 @@
 	  }, {
 	      x: data["beam_x"],
 	      y: data["beam_y"],
-	      stroke: data["sn_cg"],
-	  })
+	      //stroke: data["sn_cg"],
+	      fill: data["sn_cg"],
+	      //fillOpacity: 0.5,
+	      //mixBlendMode: "lighten",
+	      //pointerEvents: "fill",
+	  }),
+	  // red dot that follows the cursor
+	  Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
+	  Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
+								  //filter: (d) => d.info,
+								  //title: func,
+								  title: tooltips,
+								 })),
+	  //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
+								  //sn: data["sn_cg"]})),
       ],
   })
 
