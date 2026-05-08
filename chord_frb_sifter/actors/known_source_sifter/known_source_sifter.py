@@ -1,89 +1,101 @@
-"""The CHIME/FRB L2/L3 Known Source Sifter contains an actor styled
-class that determines if an event is likely originating from a known
-source.
+"""
+CHORD prototype based on the CHIME/FRB L2/L3 Known Source Sifter.
+
+Contains an actor styled class that determines if an event is likely 
+originating from a known source.
 
 """
 
 
-import shutil
-from time import sleep
-import time
-from os import path
-import requests
+import concurrent.futures as cf
 import numpy as np
-import prometheus_client as prom
-from frb_common import ActorBaseClass
+from chord_frb_sifter.actors import Actor
 from . import known_source_filters
-from frb_L2_L3 import config_dir
 
-__author__ = "CHIME FRB Group"
-__version__ = "0.1"
-__maintainer__ = "Ziggy Pleunis"
-__developers__ = "Ziggy Pleunis"
-__email__ = "ziggy@physics.mcgill.ca"
-__status__ = "Beta"
+_KS_DTYPE = np.dtype([
+    ('id',          np.int64),
+    ('source_name', 'U64'),
+    ('pos_ra_deg',  np.float32),
+    ('pos_dec_deg', np.float32),
+    ('dm',          np.float32),
+])
 
 
-class KnownSourceSifter(ActorBaseClass):
-    """A subclass of `ActorBaseClass` that determines if an L2 event
+def _load_known_sources(database_engine):
+    """Query all KnownSource rows and return as a numpy recarray."""
+    from chord_frb_db.models import KnownSource
+    from sqlalchemy.orm import Session
+    from sqlalchemy import select
+
+    rows = []
+    with Session(database_engine) as session:
+        for (ks,) in session.execute(select(KnownSource)):
+            rows.append((ks.id, ks.name, ks.ra, ks.dec, ks.dm))
+
+    if not rows:
+        return np.zeros(0, dtype=_KS_DTYPE)
+
+    arr = np.array(rows, dtype=_KS_DTYPE)
+    print('KnownSourceSifter: loaded %d known sources from DB' % len(arr))
+    return arr
+
+
+class KnownSourceSifter(Actor):
+    """A subclass of `Actor` that determines if an L2 event
     matches a known source, based on sky location and dispersion
     measure.
 
     Parameters
     ----------
+    database_engine : sqlalchemy Engine
+        Used to load and periodically refresh the known source catalog.
+    incoherent_beam_ids : list, optional
+        Beam IDs considered incoherent (RA-only position comparison).
+        Defaults to [0, 1000, 2000, 3000].
     **kwargs : dict, optional
-        Additional parameters are used to initialize superclass
-        (``ActorBaseClass``).
+        Additional parameters are passed to the superclass (``Actor``).
 
     """
 
-    EVENT_CLASS = prom.Counter(
-        "frb_kssifter_event_total",
-        "Number of events classified by the KnownSourceSifter as a particular type",
-        ["type", "worker"],
-    )
-
-    def __init__(self, threshold, sky_region, dm_region, filters, **kwargs):
+    def __init__(self, threshold, sky_region, dm_region, filters,
+                 database_engine=None, incoherent_beam_ids=None, **kwargs):
 
         super(KnownSourceSifter, self).__init__(**kwargs)
+
+        self.incoherent_beam_ids = incoherent_beam_ids if incoherent_beam_ids is not None else [0, 1000, 2000, 3000]
 
         self.threshold = threshold
         self.sky_region = sky_region
         self.dm_region = dm_region
         self.filters = filters
+        self.database_engine = database_engine
 
-        self.config_init = False
         self.ks_database = []
         self.ks_filter_names = []
         self.ks_filter_weights = []
 
         self.load_filters()
-        self.ks_url = "http://frb-l4:8100/known_sources/api/deploy_database/"
-        #sleep(1 + self.worker_id*1.5)
-        print("loading KSS into ",config_dir + "/data/known_source_sifter/")
-        self.retry_load_ks_database(config_dir + "/data/known_source_sifter/")
-        self.logger.info("Loading in the known sources database....")
-
-    def retry_load_ks_database(self, fpath):
-        for i in range(5):
-            try:
-                print("try KSS load",i)
-                self.load_ks_database(fpath=fpath)
-                break
-            except Exception as e:
-                if i == 4:
-                    raise(e)
-                time.sleep(0.1)
+        self.ks_database = _load_known_sources(database_engine)
+        self._executor = cf.ThreadPoolExecutor(max_workers=1)
+        self._update_future = None
 
     def shutdown(self):
-        self.logger.info("I have shut down gracefully")
+        self._executor.shutdown(wait=False)
 
     def update(self):
-        """Reload the known sources database periodically."""
-        self.logger.info("Reloading known sources database")
-        self.retry_load_ks_database(config_dir + "/data/known_source_sifter/")
+        """Trigger a background refresh of the known source catalog."""
+        if self._update_future is None or self._update_future.done():
+            self._update_future = self._executor.submit(
+                _load_known_sources, self.database_engine)
 
-    def perform_action(self, event):
+        if self._update_future is not None and self._update_future.done():
+            try:
+                self.ks_database = self._update_future.result()
+            except Exception:
+                import traceback; traceback.print_exc()
+            self._update_future = None
+
+    def _perform_action(self, event):
         """Pipeline function that compares `event` with known sources
         in the known sources database.
 
@@ -108,50 +120,26 @@ class KnownSourceSifter(ActorBaseClass):
 
         """
         try:
-            if self.pipeline_mode == "PASS_THROUGH":
-                event.pipeline_mode[self.process_name] = 0
-                from copy import copy
-
-                event_copy = copy(event)
-            elif self.pipeline_mode == "DEBUG":
-                event.pipeline_mode[self.process_name] = 1
-            elif self.pipeline_mode == "SCIENCE":
-                event.pipeline_mode[self.process_name] = 2
-
-            if np.in1d(event.l1_events["beam_no"],
+            if np.in1d(event.l1_events["beam"],
                        self.incoherent_beam_ids).all():
-                self.logger.debug("Event detected in incoherent beam, " +
-                                  "will only compare RA, not Dec")
-
                 ks_region, _ = nearby_known_sources_window(self.ks_database,
-                    event.pos_ra_deg, event.dm, self.sky_region,
+                    event.ra, event.dm, self.sky_region,
                     event.dm_error * self.dm_region)
             else:
                 ks_region, _ = nearby_known_sources_circle(
                     self.ks_database,
-                    event.pos_ra_deg,
-                    event.pos_dec_deg,
+                    event.ra,
+                    event.dec,
                     event.dm,
                     self.sky_region,
                     event.dm_error * self.dm_region,
                 )
 
-            self.logger.debug('Comparing event with ' +
-                              '{0} '.format(len(ks_region)) +
-                              'known sources')
-
             # only perform the comparison if there is something to compare with
             if ks_region.size > 0:
-                self.logger.debug(
-                    "Known source names: " + "{0}".format(ks_region["source_name"])
-                )
-
                 probability = self.calculate_response(event, ks_region)
 
                 probability_max = np.nanmax(probability)
-                self.logger.debug(
-                    "Probability: " + "{0}".format(probability)
-                )
 
                 # does the most likely association meet the assoc. threshold?
                 if probability_max > self.threshold:
@@ -163,77 +151,19 @@ class KnownSourceSifter(ActorBaseClass):
                     # remove the side-lobe copy identifier, if present
                     if "_" in source_name:
                         source_name = source_name.split("_")[0]
-                        src_mask = np.where(self.ks_database["source_name"] == source_name)[0]
-                        event.futures.known_source_pos_ra_deg = self.ks_database[src_mask]['pos_ra_deg'][0]
-                        event.futures.known_source_pos_dec_deg = self.ks_database[src_mask]['pos_dec_deg'][0]
-                    else:
-                        event.futures.known_source_pos_ra_deg = best_match["pos_ra_deg"]
-                        event.futures.known_source_pos_dec_deg = best_match["pos_dec_deg"]
-                     
-                    event.known_source_name = source_name
 
-                    event.known_source_rating = probability_max
+                    event['known_source_name'] = source_name
 
-                    # set true DM, RA, Dec
-                    event.futures.known_source_dm = best_match["dm"]
-                     
-                    # set maximum expected Galactic DM in event header
-                    event.dm_gal_ne_2001_max = best_match[
-                        "dm_galactic_ne_2001_max"
-                    ]
-                    event.dm_gal_ymw_2016_max = best_match[
-                        "dm_galactic_ymw_2016_max"
-                    ]
+                    event['known_source_rating'] = probability_max
 
-                    # i.e., save known source metrics but do not override
-                    # `event_category` for RFI events
-                    if event.event_category != 3:
-                        # associate known source
-                        event.event_category = 2
-                        self.logger.debug(
-                            "Event is associated with known "
-                            + "source {0}".format(source_name)
-                        )
-                        # count the number of known source associations
-                        self.EVENT_CLASS.labels(
-                            type="known_source", worker=self.worker_id
-                        ).inc()
-                else:
-                    if event.event_category != 3:
-                        # unknown source
-                        event.event_category = 1
-                        self.EVENT_CLASS.labels(
-                            type="unknown_source", worker=self.worker_id
-                        ).inc()
-            else:
-                if event.event_category != 3:
-                    # unknown source
-                    event.event_category = 1
-                    self.EVENT_CLASS.labels(
-                        type="unknown_source", worker=self.worker_id
-                    ).inc()
+                    # i.e., do not override known source flag for RFI events
+                    if not event.get('is_rfi', False):
+                        event['is_known_source'] = True
 
-            if self.pipeline_mode == "PASS_THROUGH":
-                event_copy.event_status[self.process_name] = 3  # bypass
-                self.PROCESS_STATUS.labels(
-                    status="success", actor=self.process_name
-                ).inc()
-                return [event_copy]
-            else:
-                event.event_status[self.process_name] = 0  # succes
-                # count the number of successes
-                self.PROCESS_STATUS.labels(
-                    status="success", actor=self.process_name
-                ).inc()
-                return [event]
+            return [event]
 
         except Exception as e:
             import traceback;traceback.print_exc()
-            
-
-            event.event_status[self.process_name] = 2  # failure
-            # count the number of failures
-            self.PROCESS_STATUS.labels(status="failure", actor=self.process_name).inc()
             return [event]
 
     def load_filters(self):
@@ -243,16 +173,7 @@ class KnownSourceSifter(ActorBaseClass):
 
         """
         # set sifter threshold
-        try:
-            self.threshold = float(self.threshold)
-            self.logger.info("Setting threshold to " + "{0}".format(self.threshold))
-        except Exception as e:
-            self.logger.critical(e)
-            self.logger.critical(
-                "Unable to load. "
-                + "Setting threshold to "
-                + "{0}".format(self.threshold)
-            )
+        self.threshold = float(self.threshold)
 
         # initialize filters
         for filt in self.filters:
@@ -260,51 +181,13 @@ class KnownSourceSifter(ActorBaseClass):
             if hasattr(known_source_filters, filt[0]):
                 self.ks_filter_names.append(filt[0])
                 self.ks_filter_weights.append(float(filt[1]))
-                self.logger.info("Filter '{0}' loaded".format(filt[0]))
+                print("Filter '{0}' loaded".format(filt[0]))
             else:
-                self.logger.critical(
-                    "Filter '{0}' ".format(filt[0])
-                    + "is not defined in "
-                    + "known_source_filters.py!"
-                )
+                print("Filter '{0}' is not defined in known_source_filters.py!".format(filt[0]))
 
-        nof = len(self.ks_filter_names)
-        if nof:
-            self.logger.info("Read {nof} filters".format(nof=nof))
-        else:
-            self.logger.critical(
-                "There are no filters defined! "
-                + "No known sources will be recognized!"
-            )
-        self.config_init = True
+        if not self.ks_filter_names:
+            print("There are no filters defined! No known sources will be recognized!")
 
-    def load_ks_database(self, fpath="./", fname="ks_database.npy"):
-        """Load known sources database. It's currently a numpy file.
-
-        Parameters
-        ----------
-        fpath : str
-            path to the known source database.
-
-        fname : str
-            Name of the known source database.
-            (Default: ks_database.npy)
-
-        """
-        db = path.join(fpath, fname)
-        self.ks_database = np.load(db)
-        # Download the file so that the next time, they all update to the same db
-        if self.worker_id == 0:
-            self.logger.info(f"WORKER IS {self.worker_id}. Downloading file")
-            try:
-                download_file(self.ks_url, db+".tmp", self.logger)
-                shutil.move(db + ".tmp", db)
-                self.logger.info(
-                    "{ks_no} known sources loaded".format(ks_no=self.ks_database.size)
-                )
-            except Exception as e:
-                self.logger.warn("Unable to reload ks db. Continuing to use existing one.  " + str(e))
-            
     def calculate_response(self, event, ks_region):
         """Calculates statistical match of an L2 event to a list of
         known sources.
@@ -329,8 +212,6 @@ class KnownSourceSifter(ActorBaseClass):
             known sources.
 
         """
-        assert self.config_init
-
         # call the filters one-by-one
         for i, filt in enumerate(self.ks_filter_names):
             # get the function call
@@ -465,87 +346,3 @@ def nearby_known_sources_window(ks_database, pos_ra_deg, dm, delta_ra, delta_dm)
             )
 
     return np.array([]), np.array([])
-
-def download_file(url, local_filename, logger):
-    """Downloads the known source database."""
-    logger.info(f"Downloading from {url} to file {local_filename}")
-    # Attempt 10 times
-    for i in range(10):
-        try:
-            logger.info(f"Downloading from {url}")
-            with requests.get(url, stream=True) as r:
-                r.raise_for_status()
-                logger.info(f"Downloading to {local_filename}")
-                with open(local_filename, 'wb') as f:
-                    shutil.copyfileobj(r.raw, f)
-                    break
-        except Exception as e:
-            if i == 9:
-                raise(e)
-            sleep(0.1)
-     
-if __name__ == "__main__":
-
-    """
-    from frb_common.events import simulate_events
-
-    sim = simulate_events.SimulateEvents()
-
-    ks_sifter = KnownSourceSifter(
-        threshold=1.0,
-        sky_region=5.0,
-        dm_region=2.0,
-        filters=[["compare_position", 1.0], ["compare_dm", 1.0]],
-        pipeline_mode="DEBUG",
-    )
-
-    # TODO method in `frb_common` is currently broken
-    revents = sim.get_l3_events(number_of_events=10)
-
-    ks_sifter.perform_action(revents)
-    """
-
-    # TODO can probably reduce `sky_region`
-    ks_sifter = KnownSourceSifter(threshold=1.0, sky_region=5.0, dm_region=2.0,
-                                  filters=[['compare_position', 1.0],
-                                           ['compare_dm', 1.0]],
-                                  pipeline_mode='DEBUG',
-                                  incoherent_beam_ids = \
-                                  np.array([0, 1000, 2000, 3000]))
-
-    events = np.load("B0329_events.npy", allow_pickle=True, encoding="latin1")
-
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(2, sharex=True, gridspec_kw={"hspace": 0,
-                           "height_ratios": [1, 4]})
-
-    for event in events:
-        #if not np.in1d(event.l1_events["beam_no"],
-        #               np.array([0])).all():
-        #    continue
-        event.known_source_name = ""
-        event.known_source_rating = -1
-
-        processed_event = ks_sifter.perform_action(event)[0]
-
-        if processed_event.known_source_name == "B0329+54":
-            color = "tab:blue"
-        else:
-            color = "tab:gray"
-
-        ax[0].scatter(processed_event.pos_ra_deg,
-            processed_event.known_source_rating, color=color, marker=".")
-
-        ax[1].errorbar(processed_event.pos_ra_deg, processed_event.pos_dec_deg,
-                       xerr=processed_event.pos_error_semiminor_deg_68,
-                       yerr=processed_event.pos_error_semimajor_deg_68,
-                       color=color, marker=".")
-
-    # TODO add all known_sources in neighborhood in the figure
-
-    ax[0].set_ylabel("Probability")
-    ax[1].set_xlabel("RA (deg)")
-    ax[1].set_ylabel("Dec (deg)")
-
-    plt.savefig("test_results.png", dpi=150)

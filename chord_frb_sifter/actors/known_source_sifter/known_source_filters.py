@@ -5,15 +5,14 @@ sifter. An unused template function is defined below.
 
 
 import numpy as np
+from chord_frb_sifter import config
 
-from frb_common.events.l1_event.upstream.dedisp import tree_max_dm
 
-
-__author__ = "CHIME FRB Group"
-__version__ = "0.1"
-__maintainer__ = "Ziggy Pleunis"
-__email__ = "ziggy@physics.mcgill.ca"
-__status__ = "Beta"
+def _tree_max_dm(itree):
+    l1 = config.l1_config
+    tree_dt = l1.dt_sample * l1.nds[itree] / l1.nups
+    return ((l1.tree_size[itree] - 1) * tree_dt
+            / (4.148806e3 * (1.0 / l1.freq_lo_MHz**2 - 1.0 / l1.freq_hi_MHz**2)))
 
 
 def template(event, known_sources, weight, **kwargs):
@@ -52,7 +51,7 @@ def template(event, known_sources, weight, **kwargs):
 
     # add to the header dictionary 'known_source_metrics'
     # if the key already exists its values are updated
-    if isinstance(event.known_source_metrics, dict):
+    if isinstance(event.get('known_source_metrics'), dict):
         event.known_source_metrics.update(
             {"template" + "_response": response, "template" + "_weight": weight}
         )
@@ -106,7 +105,7 @@ def compare_position(event, known_sources, weight, **kwargs):
     # default to 0, 1000, 2000 and 3000 if not specified
     incoherent_beam_ids = kwargs.get("incoherent_beam_ids", [0, 1000, 2000, 3000])
 
-    if np.in1d(event.l1_events["beam_no"], incoherent_beam_ids).all():
+    if np.in1d(event.l1_events["beam"], incoherent_beam_ids).all():
         mu_min = 0
         mu_max = 360
 
@@ -114,26 +113,26 @@ def compare_position(event, known_sources, weight, **kwargs):
         correction_factor = np.cos(np.deg2rad(known_sources['pos_dec_deg']))
         # at NCP all 360 degrees in RA are constantly in the beam
         correction_factor[correction_factor > 180.] = 180.
-        ra_uncertainty = event.pos_error_semiminor_deg_68 / \
+        ra_uncertainty = event.ra_err / \
             correction_factor
 
         # calculate Bayes factor
-        bayes_factor = gaussian_bayes(event.pos_ra_deg, ra_uncertainty,
+        bayes_factor = gaussian_bayes(event.ra, ra_uncertainty,
                                       known_sources['pos_ra_deg'], mu_min,
                                       mu_max, wrap_around=True)
     else:
         # calculate angular separations
         angle, sep = angular_separation(
-            event.pos_ra_deg,
-            event.pos_dec_deg,
+            event.ra,
+            event.dec,
             known_sources["pos_ra_deg"],
             known_sources["pos_dec_deg"],
         )
 
         sigma_event = position_uncertainty(
-            event.pos_error_semimajor_deg_68,
-            event.pos_error_semiminor_deg_68,
-            event.pos_error_theta_deg_68,
+            event.dec_err,
+            event.ra_err,
+            0.,
             angle,
         )
 
@@ -145,7 +144,7 @@ def compare_position(event, known_sources, weight, **kwargs):
 
     # add to the header dictionary 'known_source_metrics'
     # if the key already exists its values are updated
-    if isinstance(event.known_source_metrics, dict):
+    if isinstance(event.get('known_source_metrics'), dict):
         event.known_source_metrics.update({"position_weight": weight})
         for i, ks_name in enumerate(known_sources["source_name"]):
             event.known_source_metrics.update(
@@ -210,7 +209,7 @@ def compare_dm(event, known_sources, weight, **kwargs):
     # calculate max DM for downsampling tree with best detection
     best = event.l1_events[event.l1_events["snr"].argmax()]
     mu_min = 0.0
-    mu_max = tree_max_dm(best["tree_index"])
+    mu_max = _tree_max_dm(best["tree_index"])
 
     # calculate fine-grained DM step size from coarse-grained DM size
     # TODO import `dm_coarse_graining_factor` from bonsai config
@@ -230,7 +229,7 @@ def compare_dm(event, known_sources, weight, **kwargs):
 
     # add to the header dictionary 'known_source_metrics'
     # if the key already exists its values are updated
-    if isinstance(event.known_source_metrics, dict):
+    if isinstance(event.get('known_source_metrics'), dict):
         event.known_source_metrics.update({"dm_weight": weight})
         for i, ks_name in enumerate(known_sources["source_name"]):
             event.known_source_metrics.update(
