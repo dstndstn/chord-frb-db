@@ -3,11 +3,23 @@
   <head><title>D3 test</title></head>
   <body>
   <h1>D3 Test</h1>
-<div id="myplot"></div>
+
+    <div id="myplot"></div>
+    <div id="timeslider_div">
+    Time: <span id="time_display">xxx</span><br/>
+    Time: <input type="range" id="time_slider" name="time" min="0" max="10" value="8"/>
+    </div>
 <script src="static/d3.v7.js"></script>
 <script src="static/plot.js"></script>
 
 <script type="module">
+
+  const timeslider = document.querySelector("#time_slider");
+  const timedisplay = document.querySelector("#time_display");
+  timedisplay.textContent = timeslider.value;
+  timeslider.addEventListener("input", (event) => {
+      timedisplay.textContent = event.target.value;
+  });
 
   const data = await d3.json("static/snr_cg.json");
 
