@@ -28,24 +28,6 @@ timeslider.addEventListener("input", (event) => {
 
 const data = await d3.json("static/snr_cg.json");
 
-// const plot = Plot.plot({
-//     grid: true,
-//     //inset: 10,
-//     //aspectRatio: 1,
-//     //aspectRatio: fixed ? 1 : undefined,
-//     color: {legend: true},
-//     marks: [
-// 	  Plot.frame(),
-// 	  Plot.dot(data, {x: "beam_x", y: "beam_y", stroke: "sn_cg"})
-//     ]
-// })
-  
-//const plot = Plot.rectY({length: 10000}, Plot.binX({y: "count"}, {x: Math.random})).plot();
-
-//function func(x) {
-//console.log("func: " + x);
-//}
-
 var tooltips = [];
 for (var i=0; i<data["beam_x"].length; i++) {
     tooltips.push(
@@ -61,20 +43,10 @@ for (var i=0; i<data["beam_x"].length; i++) {
 	5. * Math.sqrt(i / data["beam_x"].length));
 }
 
-
-
-const plot = Plot.plot({
-    title: "Maximum FRB trigger S/N per beam",
-    grid: true,
-    aspectRatio: 1,
-    color: {legend: true,
-	    scheme: "inferno" },
-    r: {range: [0, 5]},
-    marks: [
-	Plot.frame(),
-	Plot.dot({
-	    length: data["beam_x"].length,
-	}, {
+function create_plot() {
+    const dot_plot = Plot.dot(
+	{ length: data["beam_x"].length },
+	{
 	    x: data["beam_x"],
 	    y: data["beam_y"],
 	    r: beam_size,
@@ -97,75 +69,71 @@ const plot = Plot.plot({
 		    .attr("fill", (i) => s.color(values[i]));
 		return g;
 	    }
-	}),
-	// red dot that follows the cursor
-	Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
-	// tooltip
-	Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
-								//filter: (d) => d.info,
-								//title: func,
-								title: tooltips,
-							       })),
-	//data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
-	//sn: data["sn_cg"]})),
-	// crosshairs
-	Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
-    ],
-})
+	});
 
-//Plot.lineY({length: linedata.length}, {
-//    x: linedata.map((d) => d.hour),
-//    y: linedata.map((d) => d.value),
-//    stroke: linedata.map((d) => d.sensor)
-//}).plot()
+    const plot = Plot.plot({
+	title: "Maximum FRB trigger S/N per beam",
+	grid: true,
+	aspectRatio: 1,
+	color: {legend: true,
+		scheme: "inferno" },
+	r: {range: [0, 5]},
+	marks: [
+	    Plot.frame(),
+	    dot_plot,
+	    // red dot that follows the cursor
+	    Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
+	    // tooltip
+	    Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
+								    //filter: (d) => d.info,
+								    //title: func,
+								    title: tooltips,
+								   })),
+	    //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
+	    //sn: data["sn_cg"]})),
+	    // crosshairs
+	    Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
+	],
+    });
 
-  
-var transposed = [];
-for (var i=0; i<data["beam_x"].length; i++) {
-    transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
+    return plot;
 }
-  
-// const plot = Plot.plot({
-//     // height: 200,
-// 
-//     // y axis control:
-//     // y: {
-//     // 	  type: "log",
-//     // 	  domain: [30, 300],
-//     // 	  grid: true
-//     // },
-// 
-//     title: "Maximum FRB trigger S/N per beam",
-//     grid: true,
-//     aspectRatio: 1,
-//     color: {legend: true},
-//     marks: [
-// 	  Plot.frame(),
-// 	  Plot.dot(transposed, {x: "beam_x", y: "beam_y", stroke: "sn_cg"}),
-//     ]
-// });
-// const color = plot.scale("color"); // get the color scale
-// console.log(color.range);
-  
+
+//var transposed = [];
+//for (var i=0; i<data["beam_x"].length; i++) {
+//    transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
+//}
+
+var plot = create_plot();
 const div = document.querySelector("#myplot");
 div.append(plot);
-
 
 // Animation loop
 {
     console.log("delay...");
-    //await Promises.delay(5000);
-    delay(1000);
+    await delay(1000);
     do {
 	console.log("generate random values...");
 	const newValues = Array.from({ length: data["beam_x"].length }, d3.randomInt(1, 10))
 	//const newValues = data.map(d3.randomInt(1, 10));
 	//yield newValues;
 	console.log("update plot...");
-	await plot.update(newValues).end();
+
+	for (var i=0; i<data["sn_cg"].length; i++) {
+	    data["sn_cg"][i] = newValues[i];
+	}
+
+	const newplot = create_plot();
+
+	plot.remove()
+	div.append(newplot);
+	plot = newplot;
+
+	//const dot = document.querySelector()
+	//await dot_plot.update(newValues).end();
 	//await Promises.delay(1300);
 	console.log("delay");
-	delay(1000);
+	await delay(5000);
     } while (true);
 }
 
