@@ -26,7 +26,11 @@ timeslider.addEventListener("input", (event) => {
     timedisplay.textContent = event.target.value;
 });
 
-const data = await d3.json("static/snr_cg.json");
+//const data = await d3.json("static/snr_cg_5.json");
+const data = await d3.json("static/snr_cg_4.json");
+//const data = await d3.json("static/snr_cg.json");
+
+console.log("data length: " + data["beam_x"].length);
 
 var tooltips = [];
 for (var i=0; i<data["beam_x"].length; i++) {
@@ -37,11 +41,16 @@ for (var i=0; i<data["beam_x"].length; i++) {
     );
 }
 
-var beam_size = []
+var beam_size = [];
 for (var i=0; i<data["beam_x"].length; i++) {
     beam_size.push(
 	5. * Math.sqrt(i / data["beam_x"].length));
 }
+
+console.log("beam_size: " + beam_size.length);
+console.log("beam_x: " + data["beam_x"].length);
+console.log("beam_y: " + data["beam_y"].length);
+console.log("beam sn: " + data["sn_cg"].length);
 
 function create_plot() {
     const dot_plot = Plot.dot(
@@ -57,6 +66,7 @@ function create_plot() {
 	    //pointerEvents: "fill",
 	    //scheme: "magma",
 
+	    /*
 	    render: (i, s, v, d, c, next) => {
 		console.log("render() called");
 		const g = next(i, s, v, d, c);
@@ -68,19 +78,33 @@ function create_plot() {
 		//.duration(750)
 		    .attr("fill", (i) => s.color(values[i]));
 		return g;
-	    }
+		}
+		*/
 	});
+
+    console.log("dot_plot: " + dot_plot);
+    console.log("keys: " + Object.keys(dot_plot));
+    dot_plot["id"] = "dot_plot";
+    dot_plot["className"] = "dot_plot_class";
+    //console.log("children: " + dot_plot.children.length);
+    console.log("data: " + dot_plot["data"].length);
 
     const plot = Plot.plot({
 	title: "Maximum FRB trigger S/N per beam",
 	grid: true,
 	aspectRatio: 1,
 	color: {legend: true,
-		scheme: "inferno" },
-	r: {range: [0, 5]},
+		scheme: "inferno",
+		domain: [0, 10],
+	       },
+	r: {range: [0, 10]},
+	x: {domain: [-6, +6]},
+	y: {domain: [-6, +6]},
+	clip: false,
 	marks: [
 	    Plot.frame(),
 	    dot_plot,
+	    /*
 	    // red dot that follows the cursor
 	    Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
 	    // tooltip
@@ -92,7 +116,8 @@ function create_plot() {
 	    //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
 	    //sn: data["sn_cg"]})),
 	    // crosshairs
-	    Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
+	    Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]}),
+	    */
 	],
     });
 
@@ -111,8 +136,9 @@ div.append(plot);
 // Animation loop
 {
     console.log("delay...");
-    await delay(1000);
+    await delay(5000);
     do {
+	break;
 	console.log("generate random values...");
 	const newValues = Array.from({ length: data["beam_x"].length }, d3.randomInt(1, 10))
 	//const newValues = data.map(d3.randomInt(1, 10));
@@ -120,16 +146,23 @@ div.append(plot);
 	console.log("update plot...");
 
 	for (var i=0; i<data["sn_cg"].length; i++) {
-	    data["sn_cg"][i] = newValues[i];
+	    //data["sn_cg"][i] = newValues[i];
+	    data["sn_cg"][i] = 0.0;
 	}
 
-	const newplot = create_plot();
+	const dot = document.querySelector(".dot_plot_class");
+	console.log("querySelector: " + dot);
+	const kids = dot.children;
+	console.log("children: " + kids);
+	console.log("length: " + kids.length);
 
+	//break;
+
+	const newplot = create_plot();
 	plot.remove()
 	div.append(newplot);
 	plot = newplot;
 
-	//const dot = document.querySelector()
 	//await dot_plot.update(newValues).end();
 	//await Promises.delay(1300);
 	console.log("delay");
