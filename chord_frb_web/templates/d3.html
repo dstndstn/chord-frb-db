@@ -18,6 +18,14 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const snr_min = 0.;
+const snr_max = 10.;
+
+function get_color(snr) {
+    const t = (snr - snr_min) / (snr_max - snr_min);
+    return d3.interpolateInferno(t);
+    //return d3.interpolateTurbo(t);
+}
 
 const timeslider = document.querySelector("#time_slider");
 const timedisplay = document.querySelector("#time_display");
@@ -27,32 +35,26 @@ timeslider.addEventListener("input", (event) => {
 });
 
 //const data = await d3.json("static/snr_cg_5.json");
-const data = await d3.json("static/snr_cg_4.json");
-//const data = await d3.json("static/snr_cg.json");
+//const data = await d3.json("static/snr_cg_4.json");
+const data = await d3.json("static/snr_cg.json");
+const N = data["beam_x"].length;
 
-console.log("data length: " + data["beam_x"].length);
+console.log("data length: " + N);
 
 var tooltips = [];
-for (var i=0; i<data["beam_x"].length; i++) {
+for (var i=0; i<N; i++) {
     tooltips.push(
 	"Beam: " + (i+1) + "\n" +
 	    "SN: " + data["sn_cg"][i].toFixed(2)
-	//{"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]}
     );
 }
 
 var beam_size = [];
-for (var i=0; i<data["beam_x"].length; i++) {
-    beam_size.push(
-	5. * Math.sqrt(i / data["beam_x"].length));
+for (var i=0; i<N; i++) {
+    beam_size.push(2 + 8*Math.sqrt(i / N));
 }
 
-console.log("beam_size: " + beam_size.length);
-console.log("beam_x: " + data["beam_x"].length);
-console.log("beam_y: " + data["beam_y"].length);
-console.log("beam sn: " + data["sn_cg"].length);
-
-function create_plot() {
+//function create_plot() {
     const dot_plot = Plot.dot(
 	{ length: data["beam_x"].length },
 	{
@@ -82,8 +84,6 @@ function create_plot() {
 		*/
 	});
 
-    console.log("dot_plot: " + dot_plot);
-    console.log("keys: " + Object.keys(dot_plot));
     dot_plot["id"] = "dot_plot";
     dot_plot["className"] = "dot_plot_class";
     //console.log("children: " + dot_plot.children.length);
@@ -95,16 +95,16 @@ function create_plot() {
 	aspectRatio: 1,
 	color: {legend: true,
 		scheme: "inferno",
-		domain: [0, 10],
+		domain: [snr_min, snr_max],
 	       },
-	r: {range: [0, 10]},
-	x: {domain: [-6, +6]},
-	y: {domain: [-6, +6]},
+	// enforce radius range?
+	//r: {range: [2, 10]},
+	x: {domain: [-2.5, +2.5]},
+	y: {domain: [-2.5, +2.5]},
 	clip: false,
 	marks: [
 	    Plot.frame(),
 	    dot_plot,
-	    /*
 	    // red dot that follows the cursor
 	    Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
 	    // tooltip
@@ -117,37 +117,54 @@ function create_plot() {
 	    //sn: data["sn_cg"]})),
 	    // crosshairs
 	    Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]}),
-	    */
 	],
     });
 
-    return plot;
-}
+//return plot;
+//}
 
 //var transposed = [];
 //for (var i=0; i<data["beam_x"].length; i++) {
 //    transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
 //}
 
-var plot = create_plot();
+//var plot = create_plot();
 const div = document.querySelector("#myplot");
 div.append(plot);
 
 // Animation loop
 {
+    
     console.log("delay...");
-    await delay(5000);
+    await delay(3000);
+
+    console.log("plot: " + plot);
+    console.log("dot_plot: " + dot_plot);
+    for (const k in dot_plot) {
+	console.log("dot_plot " + k + " = " + dot_plot[k]);
+    }
+    var channels = dot_plot["channels"];
+    for (const k in channels) {
+	console.log("dot_plot.channels " + k + " = " + channels[k]);
+    }
+    var fill = dot_plot["channels"]["fill"];
+    for (const k in fill) {
+	console.log("dot_plot.channels.fill " + k + " = " + channels[k]);
+    }
+    
     do {
-	break;
 	console.log("generate random values...");
-	const newValues = Array.from({ length: data["beam_x"].length }, d3.randomInt(1, 10))
-	//const newValues = data.map(d3.randomInt(1, 10));
-	//yield newValues;
+	//const newValues = Array.from({ length: N }, d3.randomInt(1, 10));
+	//const newValues = Array.from({ length: N }, d3.randomNormal(6, 1));
+	var newValues = [];
+	for (var i=0; i<N; i++) {
+	    newValues.push(snr_min + (snr_max - snr_min) * i / (N-1));
+	}
+
 	console.log("update plot...");
 
-	for (var i=0; i<data["sn_cg"].length; i++) {
-	    //data["sn_cg"][i] = newValues[i];
-	    data["sn_cg"][i] = 0.0;
+	for (var i=0; i<N; i++) {
+	    data["sn_cg"][i] = newValues[i];
 	}
 
 	const dot = document.querySelector(".dot_plot_class");
@@ -156,17 +173,52 @@ div.append(plot);
 	console.log("children: " + kids);
 	console.log("length: " + kids.length);
 
-	//break;
+	for (var i=0; i<N; i++) {
+	    if (i == 0) {
+		console.log("kid: " + kids[i]);
+		for (const k in kids[i]) {
+		    console.log("key: " + k + " = " + kids[i][k]);
+		}
+		console.log("dataset: " + kids[i]["dataset"]);
+		for (const k in kids[i]["dataset"]) {
+		    console.log("dataset : " + k + " = " + kids[i]["dataset"][k]);
+		}
+		console.log("getAttributeNames: " + kids[i].getAttributeNames());
+		console.log("getAttribute fill: " + kids[i].getAttribute("fill"));
+		console.log("getAttribute cx: " + kids[i].getAttribute("cx"));
+		console.log("getAttribute cy: " + kids[i].getAttribute("cy"));
 
-	const newplot = create_plot();
-	plot.remove()
-	div.append(newplot);
-	plot = newplot;
+		var cc = get_color(newValues[i]);
+		console.log("new color: " + cc);
+		kids[i].setAttribute("fill", cc);
+
+		//for (const prop in kids[i].style) {
+		//    console.log("style." + prop + " = " + kids[i].style[prop]);
+		//}
+	    }
+
+	    // Gotta love an arbitrary, undocumented level of indirection!
+	    var index = kids[i]["__data__"];
+	    //var cc = get_color(newValues[i]);
+	    var cc = get_color(newValues[index]);
+	    kids[i].setAttribute("fill", cc);
+
+	    //kids[i]["fill"] = "#ff0000";
+	    //kids[i].style.foregroundColor = "red";
+	    //kids[i].style.fill = "red";
+	    
+	}
+
+	//const newplot = create_plot();
+	//plot.remove()
+	//div.append(newplot);
+	//plot = newplot;
 
 	//await dot_plot.update(newValues).end();
 	//await Promises.delay(1300);
 	console.log("delay");
-	await delay(5000);
+	await delay(3000);
+	break;
     } while (true);
 }
 

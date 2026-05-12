@@ -20,6 +20,10 @@ db = SQLAlchemy(app)
 def d3():
     return render_template('d3.html')
 
+@app.route('/mwe')
+def mwe():
+    return render_template('mwe.html')
+
 @app.route('/l1-events/<int:event_id>')
 def l1_event_list(event_id):
     query = sa.select(EventBeam).filter_by(event_id=event_id)
