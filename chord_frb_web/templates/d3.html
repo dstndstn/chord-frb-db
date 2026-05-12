@@ -14,28 +14,33 @@
 
 <script type="module">
 
-  const timeslider = document.querySelector("#time_slider");
-  const timedisplay = document.querySelector("#time_display");
-  timedisplay.textContent = timeslider.value;
-  timeslider.addEventListener("input", (event) => {
-      timedisplay.textContent = event.target.value;
-  });
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-  const data = await d3.json("static/snr_cg.json");
 
-  // const plot = Plot.plot({
-  //     grid: true,
-  //     //inset: 10,
-  //     //aspectRatio: 1,
-  //     //aspectRatio: fixed ? 1 : undefined,
-  //     color: {legend: true},
-  //     marks: [
-  // 	  Plot.frame(),
-  // 	  Plot.dot(data, {x: "beam_x", y: "beam_y", stroke: "sn_cg"})
-  //     ]
-  // })
+const timeslider = document.querySelector("#time_slider");
+const timedisplay = document.querySelector("#time_display");
+timedisplay.textContent = timeslider.value;
+timeslider.addEventListener("input", (event) => {
+    timedisplay.textContent = event.target.value;
+});
+
+const data = await d3.json("static/snr_cg.json");
+
+// const plot = Plot.plot({
+//     grid: true,
+//     //inset: 10,
+//     //aspectRatio: 1,
+//     //aspectRatio: fixed ? 1 : undefined,
+//     color: {legend: true},
+//     marks: [
+// 	  Plot.frame(),
+// 	  Plot.dot(data, {x: "beam_x", y: "beam_y", stroke: "sn_cg"})
+//     ]
+// })
   
-  //const plot = Plot.rectY({length: 10000}, Plot.binX({y: "count"}, {x: Math.random})).plot();
+//const plot = Plot.rectY({length: 10000}, Plot.binX({y: "count"}, {x: Math.random})).plot();
 
 //function func(x) {
 //console.log("func: " + x);
@@ -45,7 +50,7 @@ var tooltips = [];
 for (var i=0; i<data["beam_x"].length; i++) {
     tooltips.push(
 	"Beam: " + (i+1) + "\n" +
-	"SN: " + data["sn_cg"][i].toFixed(2)
+	    "SN: " + data["sn_cg"][i].toFixed(2)
 	//{"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]}
     );
 }
@@ -56,79 +61,116 @@ for (var i=0; i<data["beam_x"].length; i++) {
 	5. * Math.sqrt(i / data["beam_x"].length));
 }
 
-  const plot = Plot.plot({
-      title: "Maximum FRB trigger S/N per beam",
-      grid: true,
-      aspectRatio: 1,
-      color: {legend: true,
-	      scheme: "inferno" },
-      r: {range: [0, 5]},
-      marks: [
-	  Plot.frame(),
-	  Plot.dot({
-	      length: data["beam_x"].length,
-	  }, {
-	      x: data["beam_x"],
-	      y: data["beam_y"],
-	      r: beam_size,
-	      //stroke: data["sn_cg"],
-	      fill: data["sn_cg"],
-	      //fillOpacity: 0.5,
-	      //mixBlendMode: "lighten",
-	      //pointerEvents: "fill",
-	      //scheme: "magma",
-	  }),
-	  // red dot that follows the cursor
-	  Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
-	  // tooltip
-	  Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
-								  //filter: (d) => d.info,
-								  //title: func,
-								  title: tooltips,
-								 })),
-	  //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
-	  //sn: data["sn_cg"]})),
-	  // crosshairs
-	  Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
-      ],
-  })
 
-  //Plot.lineY({length: linedata.length}, {
-  //    x: linedata.map((d) => d.hour),
-  //    y: linedata.map((d) => d.value),
-  //    stroke: linedata.map((d) => d.sensor)
-  //}).plot()
+
+const plot = Plot.plot({
+    title: "Maximum FRB trigger S/N per beam",
+    grid: true,
+    aspectRatio: 1,
+    color: {legend: true,
+	    scheme: "inferno" },
+    r: {range: [0, 5]},
+    marks: [
+	Plot.frame(),
+	Plot.dot({
+	    length: data["beam_x"].length,
+	}, {
+	    x: data["beam_x"],
+	    y: data["beam_y"],
+	    r: beam_size,
+	    //stroke: data["sn_cg"],
+	    fill: data["sn_cg"],
+	    //fillOpacity: 0.5,
+	    //mixBlendMode: "lighten",
+	    //pointerEvents: "fill",
+	    //scheme: "magma",
+
+	    render: (i, s, v, d, c, next) => {
+		console.log("render() called");
+		const g = next(i, s, v, d, c);
+		c.ownerSVGElement.update = (values) =>
+		d3
+		    .select(g)
+		    .selectAll("circle")
+		//.transition()
+		//.duration(750)
+		    .attr("fill", (i) => s.color(values[i]));
+		return g;
+	    }
+	}),
+	// red dot that follows the cursor
+	Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
+	// tooltip
+	Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
+								//filter: (d) => d.info,
+								//title: func,
+								title: tooltips,
+							       })),
+	//data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
+	//sn: data["sn_cg"]})),
+	// crosshairs
+	Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]})
+    ],
+})
+
+//Plot.lineY({length: linedata.length}, {
+//    x: linedata.map((d) => d.hour),
+//    y: linedata.map((d) => d.value),
+//    stroke: linedata.map((d) => d.sensor)
+//}).plot()
 
   
-  var transposed = [];
-  for (var i=0; i<data["beam_x"].length; i++) {
-      transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
-  }
+var transposed = [];
+for (var i=0; i<data["beam_x"].length; i++) {
+    transposed.push({"beam_x": data["beam_x"][i], "beam_y": data["beam_y"][i], "sn_cg": data["sn_cg"][i]});
+}
   
-  // const plot = Plot.plot({
-  //     // height: 200,
-  // 
-  //     // y axis control:
-  //     // y: {
-  //     // 	  type: "log",
-  //     // 	  domain: [30, 300],
-  //     // 	  grid: true
-  //     // },
-  // 
-  //     title: "Maximum FRB trigger S/N per beam",
-  //     grid: true,
-  //     aspectRatio: 1,
-  //     color: {legend: true},
-  //     marks: [
-  // 	  Plot.frame(),
-  // 	  Plot.dot(transposed, {x: "beam_x", y: "beam_y", stroke: "sn_cg"}),
-  //     ]
-  // });
-  // const color = plot.scale("color"); // get the color scale
-  // console.log(color.range);
+// const plot = Plot.plot({
+//     // height: 200,
+// 
+//     // y axis control:
+//     // y: {
+//     // 	  type: "log",
+//     // 	  domain: [30, 300],
+//     // 	  grid: true
+//     // },
+// 
+//     title: "Maximum FRB trigger S/N per beam",
+//     grid: true,
+//     aspectRatio: 1,
+//     color: {legend: true},
+//     marks: [
+// 	  Plot.frame(),
+// 	  Plot.dot(transposed, {x: "beam_x", y: "beam_y", stroke: "sn_cg"}),
+//     ]
+// });
+// const color = plot.scale("color"); // get the color scale
+// console.log(color.range);
   
-  const div = document.querySelector("#myplot");
-  div.append(plot);
+const div = document.querySelector("#myplot");
+div.append(plot);
+
+
+// Animation loop
+{
+    console.log("delay...");
+    //await Promises.delay(5000);
+    delay(1000);
+    do {
+	console.log("generate random values...");
+	const newValues = Array.from({ length: data["beam_x"].length }, d3.randomInt(1, 10))
+	//const newValues = data.map(d3.randomInt(1, 10));
+	//yield newValues;
+	console.log("update plot...");
+	await plot.update(newValues).end();
+	//await Promises.delay(1300);
+	console.log("delay");
+	delay(1000);
+    } while (true);
+}
+
+
+
 
 </script>
 
@@ -172,6 +214,8 @@ for (var i=0; i<data["beam_x"].length; i++) {
   // Append the SVG element.
   container.append(svg.node());
 
+
+ 
 </script>
 #}
 
