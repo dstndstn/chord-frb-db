@@ -10,6 +10,9 @@ all: $(HELLO)
 SIFTER := frb_sifter_pb2.py frb_sifter_pb2.pyi frb_sifter_pb2_grpc.py
 all: $(SIFTER)
 
+SIFTER_CHIME := frb_sifter_chime_pb2.py frb_sifter_chime_pb2.pyi frb_sifter_chime_pb2_grpc.py
+all: $(SIFTER_CHIME)
+
 %_pb2.py %_pb2.pyi %_pb2_grpc.py: %.proto
 	python -m grpc_tools.protoc -I=. --python_out=. --pyi_out=. --grpc_python_out=. $<
 
