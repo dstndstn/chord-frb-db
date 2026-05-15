@@ -83,7 +83,7 @@ class RFISifter(Actor):
         if event.rfi_grade_level2 < self.threshold:
 
             # set event_category to RFI (=3)
-            event.is_rfi = True
+            event.set_rfi()
 
             print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
 
@@ -92,9 +92,6 @@ class RFISifter(Actor):
         else:
 
             print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
-
-            # For now if its not RFI say its unknown (KSS can change later)
-            event.is_rfi = False
 
             return [event]
 

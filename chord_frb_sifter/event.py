@@ -203,6 +203,8 @@ class L2Event(dict):
     def is_known_source(self):
         return getattr(self, 'flag_known_source', False)
 
+    def set_rfi(self):
+        self.flag_rfi = True
     def set_frb(self):
         self.flag_frb = True
     def set_ambiguous(self):
@@ -242,7 +244,6 @@ class L2Event(dict):
             'dm_error': True,
             'ra': True,
             'dec': True,
-            'is_rfi': True,
             'is_frb': True,
             'pos_ra_deg': 'ra',
             'pos_error_semimajor_deg_68': 'ra_error',
