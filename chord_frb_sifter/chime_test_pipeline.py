@@ -28,11 +28,13 @@ def create_pipeline(database_engine=None):
     from chord_frb_sifter import config
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
+    from chord_frb_sifter.actors.event_id_stamper import EventIdStamper
     from chord_frb_sifter.actors.rfi_sifter import RFISifter
     from chord_frb_sifter.actors.bright_pulsar_sifter import BrightPulsarSifter
     from chord_frb_sifter.actors.simple_localizer_cfbm import SimpleLocalizerCFBM
     from chord_frb_sifter.actors.known_source_sifter import KnownSourceSifter
     from chord_frb_sifter.actors.dm_checker import DMChecker
+    from chord_frb_sifter.actors.actions import ActionPicker
 
     if database_engine is None:
         import os
@@ -43,15 +45,17 @@ def create_pipeline(database_engine=None):
     pipeline = []
     for name, clz in [('BeamBuffer', BeamBuffer),
                       ('BeamGrouper', BeamGrouper),
+                      ('EventIdStamper', EventIdStamper),
                       ('RFISifter', RFISifter),
                       ('BrightPulsarSifter', BrightPulsarSifter),
                       ('SimpleLocalizerCFBM', SimpleLocalizerCFBM),
                       ('KnownSourceSifter', KnownSourceSifter),
-                      ('DMChecker', DMChecker)]:
+                      ('DMChecker', DMChecker),
+                      ('ActionPicker', ActionPicker)]:
         conf = config.get_worker_configuration(name)
         for key in ['io', 'log', 'use_pickle', 'timeout', 'periodic_update']:
             conf.pop(key, None)
-        if clz is KnownSourceSifter:
+        if clz in (EventIdStamper, KnownSourceSifter, ActionPicker):
             conf['database_engine'] = database_engine
         if clz is SimpleLocalizerCFBM:
             conf = {}
