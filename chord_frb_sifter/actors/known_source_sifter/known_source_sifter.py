@@ -157,7 +157,7 @@ class KnownSourceSifter(Actor):
                     event['known_source_rating'] = probability_max
 
                     # i.e., do not override known source flag for RFI events
-                    if not event.get('is_rfi', False):
+                    if not event.is_rfi():
                         event['is_known_source'] = True
 
             return [event]

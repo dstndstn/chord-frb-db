@@ -57,6 +57,9 @@ class BrightPulsarSifter(Actor):
                 if abs(dm - params['dm']) < params['dm_tol']:
                     event['is_bright_pulsar'] = True
                     event['bright_pulsar_name'] = pulsar
+                    event['known_source_name'] = pulsar
+                    if not event.is_rfi():
+                        event['is_known_source'] = True
                     return [event]
 
         event['is_bright_pulsar'] = False
