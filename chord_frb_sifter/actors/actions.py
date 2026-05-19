@@ -83,9 +83,13 @@ class ActionPicker(Actor):
                 event = self.db_queue.get()
                 if event is None:
                     break
-                self.save_event_to_db(session, event)
-                session.flush()
-                session.commit()
+                try:
+                    self.save_event_to_db(session, event)
+                    session.flush()
+                    session.commit()
+                except Exception:
+                    import traceback; traceback.print_exc()
+                    session.rollback()
         print('Database thread ending')
 
     def save_event_to_db(self, session, event):
@@ -107,9 +111,9 @@ class ActionPicker(Actor):
         # Resolve known_source_name → known_id
         known_name = event.get('known_source_name', '')
         if known_name:
-            ks = session.execute(
-                select(KnownSource).where(KnownSource.name == known_name)
-            ).scalar_one_or_none()
+            ks = session.scalars(
+                select(KnownSource).where(KnownSource.name == known_name).limit(1)
+            ).first()
             if ks is not None:
                 l2_db_obj.known_id = ks.id
 
