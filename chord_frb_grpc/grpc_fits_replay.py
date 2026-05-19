@@ -167,9 +167,12 @@ def main():
     parser.add_argument('--server', default='localhost:50051')
     parser.add_argument('--n-files', type=int, default=None,
                         help='Limit number of FITS files (default: all)')
+    parser.add_argument('--start-file', type=int, default=0,
+                        help='Index of first file to replay (default: 0)')
     args = parser.parse_args()
 
     fits_files = sorted(glob.glob(os.path.join(args.fits_dir, '*.fits')))
+    fits_files = fits_files[args.start_file:]
     if args.n_files:
         fits_files = fits_files[:args.n_files]
     if not fits_files:

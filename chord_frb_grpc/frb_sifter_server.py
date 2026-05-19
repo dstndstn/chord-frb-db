@@ -25,7 +25,6 @@ def _proto_event_to_l1(e, message):
         'chunk_fpga':             message.chunk_fpga_count,
         'chunk_utc':              chunk_utc,
         'dm':                     e.dm,
-        'dm_error':               e.dm_error,
         'snr':                    e.snr,
         'tree_index':             e.tree_index,
         'snr_scale':              e.snr_scale,
