@@ -2,8 +2,10 @@
 CHIME FITS replay client — simulates N search nodes sending L1 events via gRPC.
 
 Each node is assigned a disjoint subset of the 1024 CHIME beams and runs in its
-own thread. Nodes send events file-by-file in sorted order; each unique FPGA
-chunk within a file is sent as a single FrbEventsMessage.
+own thread. Nodes send events file-by-file in sorted order; each unique timechunk
+(by fpga count) within a file is sent as a single FrbEventsMessage.
+Every node sends a message for every timechunk in every file, even if it has no
+events for that timechunk, so the server can detect when all nodes have checked in.
 
 Usage:
     python grpc_fits_replay.py \\
@@ -126,37 +128,29 @@ def _node_thread(node_id, assigned_beams, fits_files, server_addr,
         data = fitsio.read(fn)
         frame0_nano = int(data['frame0_nano'][0])
 
-        # Filter to this node's beams
+        # Collect all timechunks in this file before beam-filtering so every
+        # node sends one message per timechunk regardless of whether it has events.
+        all_timechunks = np.unique(data['fpga'])
+
         mask = np.isin(data['beam'], list(assigned_set))
-        if not mask.any():
-            continue
-        data = data[mask]
+        node_data = data[mask]
 
-        fpgas = data['fpga']
-        beams = data['beam']
+        for timechunk in all_timechunks:
+            chunk_mask = node_data['fpga'] == timechunk
+            chunk_data = node_data[chunk_mask]
 
-        for fpga in np.unique(fpgas):
-            chunk_mask = fpgas == fpga
-            chunk_data  = data[chunk_mask]
-            chunk_beams = beams[chunk_mask]
-
-            events = []
-            for i in range(len(chunk_data)):
-                beam = int(chunk_beams[i])
-                if beam not in assigned_set:
-                    continue
-                events.append(_row_to_proto_event(chunk_data[i], beam,
-                                                  beam_to_dradec, beam_to_xygrid))
-
-            if not events:
-                continue
+            events = [
+                _row_to_proto_event(chunk_data[i], int(chunk_data['beam'][i]),
+                                    beam_to_dradec, beam_to_xygrid)
+                for i in range(len(chunk_data))
+            ]
 
             msg = FrbEventsMessage(
-                has_injections  = False,
-                beam_set_id     = node_id,
-                chunk_fpga_count= int(fpga),
-                frame0_nano     = frame0_nano,
-                events          = events,
+                has_injections   = False,
+                beam_set_id      = node_id,
+                chunk_fpga_count = int(timechunk),
+                frame0_nano      = frame0_nano,
+                events           = events,
             )
             r = stub.FrbEvents(msg)
             if not r.ok:
