@@ -57,6 +57,7 @@ def create_l2_event(l1_events, **kwargs):
     for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
         l2_event['max_' + k] = best_event[k]
         del l2_event[k]
+    l2_event['combined_snr'] = best_snr
     #
     l2_event.update(kwargs)
     
