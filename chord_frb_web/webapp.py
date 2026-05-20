@@ -24,6 +24,20 @@ def d3():
 def mwe():
     return render_template('mwe.html')
 
+@app.route('/beam-snr')
+def beam_snr():
+    # input: time range
+    # returns JSON: list of tuples: (beamset, max-beam_snr-during-that-time-period array)
+    # from querying the BeamSNR table
+    pass
+
+@app.route('/beamset/<int:beamset_id>')
+def beamset():
+    # input: beamset
+    # output: most recent beam_x, beam_y, beam_id for that beamset
+    # from the PirateConfig table
+    pass
+
 @app.route('/l1-events/<int:event_id>')
 def l1_event_list(event_id):
     query = sa.select(EventBeam).filter_by(event_id=event_id)

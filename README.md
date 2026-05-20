@@ -92,6 +92,10 @@ the buffer.
 
 
 
+## Random notes
+
+`$ psql -h db -U chordfrb -W`
+
 
 
 # OLD STUFF BELOW HERE
