@@ -12,10 +12,14 @@ service FrbSifter {
   // Report events from a given time chunk.
   rpc FrbEvents (FrbEventsMessage) returns (FrbEventsReply) {}
 
+  // Report the max SNR seen per beam for a given time period
+  rpc FrbBeamSNR (FrbBeamSNRMessage) returns (FrbBeamSNRReply) {}
+
 }
 
 message ConfigMessage {
-  string yaml = 1;
+  string pirate_yaml = 2;
+  string xengine_yaml = 3;
 }
 
 message ConfigReply {
@@ -49,6 +53,19 @@ message FrbEventsMessage {
 }
 
 message FrbEventsReply {
+  bool ok = 1;
+  string message = 2;
+}
+
+message FrbBeamSNRMessage {
+  int32 beam_set_id = 1;
+  int64 start_fpga_count = 2;
+  int64 end_fpga_count = 3;
+  // A (large) array of SNRs, the same length as the beams being handled by this beam_set_id.
+  repeated float snr = 4;
+}
+
+message FrbBeamSNRReply {
   bool ok = 1;
   string message = 2;
 }

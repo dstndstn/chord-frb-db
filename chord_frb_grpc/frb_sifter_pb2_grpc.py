@@ -5,7 +5,7 @@ import warnings
 
 import frb_sifter_pb2 as frb__sifter__pb2
 
-GRPC_GENERATED_VERSION = '1.74.0'
+GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in frb_sifter_pb2_grpc.py depends on'
+        + ' but the generated code in frb_sifter_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -44,6 +44,11 @@ class FrbSifterStub(object):
                 request_serializer=frb__sifter__pb2.FrbEventsMessage.SerializeToString,
                 response_deserializer=frb__sifter__pb2.FrbEventsReply.FromString,
                 _registered_method=True)
+        self.FrbBeamSNR = channel.unary_unary(
+                '/FrbSifter/FrbBeamSNR',
+                request_serializer=frb__sifter__pb2.FrbBeamSNRMessage.SerializeToString,
+                response_deserializer=frb__sifter__pb2.FrbBeamSNRReply.FromString,
+                _registered_method=True)
 
 
 class FrbSifterServicer(object):
@@ -67,6 +72,13 @@ class FrbSifterServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def FrbBeamSNR(self, request, context):
+        """Report the max SNR seen per beam for a given time period
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_FrbSifterServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -79,6 +91,11 @@ def add_FrbSifterServicer_to_server(servicer, server):
                     servicer.FrbEvents,
                     request_deserializer=frb__sifter__pb2.FrbEventsMessage.FromString,
                     response_serializer=frb__sifter__pb2.FrbEventsReply.SerializeToString,
+            ),
+            'FrbBeamSNR': grpc.unary_unary_rpc_method_handler(
+                    servicer.FrbBeamSNR,
+                    request_deserializer=frb__sifter__pb2.FrbBeamSNRMessage.FromString,
+                    response_serializer=frb__sifter__pb2.FrbBeamSNRReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -135,6 +152,33 @@ class FrbSifter(object):
             '/FrbSifter/FrbEvents',
             frb__sifter__pb2.FrbEventsMessage.SerializeToString,
             frb__sifter__pb2.FrbEventsReply.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FrbBeamSNR(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/FrbSifter/FrbBeamSNR',
+            frb__sifter__pb2.FrbBeamSNRMessage.SerializeToString,
+            frb__sifter__pb2.FrbBeamSNRReply.FromString,
             options,
             channel_credentials,
             insecure,

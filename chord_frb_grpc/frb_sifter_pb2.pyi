@@ -7,10 +7,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ConfigMessage(_message.Message):
-    __slots__ = ("yaml",)
-    YAML_FIELD_NUMBER: _ClassVar[int]
-    yaml: str
-    def __init__(self, yaml: _Optional[str] = ...) -> None: ...
+    __slots__ = ("pirate_yaml", "xengine_yaml")
+    PIRATE_YAML_FIELD_NUMBER: _ClassVar[int]
+    XENGINE_YAML_FIELD_NUMBER: _ClassVar[int]
+    pirate_yaml: str
+    xengine_yaml: str
+    def __init__(self, pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ...) -> None: ...
 
 class ConfigReply(_message.Message):
     __slots__ = ("ok",)
@@ -47,6 +49,26 @@ class FrbEventsMessage(_message.Message):
     def __init__(self, has_injections: bool = ..., beam_set_id: _Optional[int] = ..., chunk_fpga_count: _Optional[int] = ..., events: _Optional[_Iterable[_Union[FrbEvent, _Mapping]]] = ...) -> None: ...
 
 class FrbEventsReply(_message.Message):
+    __slots__ = ("ok", "message")
+    OK_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    ok: bool
+    message: str
+    def __init__(self, ok: bool = ..., message: _Optional[str] = ...) -> None: ...
+
+class FrbBeamSNRMessage(_message.Message):
+    __slots__ = ("beam_set_id", "start_fpga_count", "end_fpga_count", "snr")
+    BEAM_SET_ID_FIELD_NUMBER: _ClassVar[int]
+    START_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    END_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    SNR_FIELD_NUMBER: _ClassVar[int]
+    beam_set_id: int
+    start_fpga_count: int
+    end_fpga_count: int
+    snr: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, beam_set_id: _Optional[int] = ..., start_fpga_count: _Optional[int] = ..., end_fpga_count: _Optional[int] = ..., snr: _Optional[_Iterable[float]] = ...) -> None: ...
+
+class FrbBeamSNRReply(_message.Message):
     __slots__ = ("ok", "message")
     OK_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]

@@ -30,9 +30,10 @@ public:
     FrbSifterClient(std::shared_ptr<Channel> channel)
         : stub_(FrbSifter::NewStub(channel)) {}
 
-    bool CheckConfiguration(const std::string& config_yaml) {
+  bool CheckConfiguration(const std::string& config_yaml, const std::string& xengine_yaml) {
         ConfigMessage msg;
-        msg.set_yaml(config_yaml);
+        msg.set_pirate_yaml(config_yaml);
+        msg.set_xengine_yaml(xengine_yaml);
         ConfigReply reply;
         reply.set_ok(false);
 
@@ -94,7 +95,8 @@ int main(int argc, char** argv) {
   FrbSifterClient sifter(grpc::CreateChannel(target_str, grpc::InsecureChannelCredentials()));
 
   std::string config_yaml("ceci n'est pas yaml");
-  bool ok = sifter.CheckConfiguration(config_yaml);
+  std::string xengine_yaml("pas celui");
+  bool ok = sifter.CheckConfiguration(config_yaml, xengine_yaml);
   std::cout << "Sifter config check: " << ok << std::endl;
 
   bool injections = false;
