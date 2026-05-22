@@ -80,9 +80,11 @@ def _load_config_yaml():
     return yaml.dump({'bonsai_config': content})
 
 
-def _row_to_proto_event(row, beam, beam_to_dradec, beam_to_xygrid):
+def _row_to_proto_event(row, beam, beam_to_dradec, beam_to_xygrid, frame0_nano):
     dra, ddec = beam_to_dradec[beam]
     gx, gy    = beam_to_xygrid[beam]
+    # timestamp_utc in FITS is empty (zero); compute from frame0_nano and fpga_timestamp
+    timestamp_utc = frame0_nano/1000 + int(row['timestamp_fpga']) * 2.56
     return FrbEvent(
         beam_id                = beam,
         fpga_timestamp         = int(row['timestamp_fpga']),
@@ -90,7 +92,7 @@ def _row_to_proto_event(row, beam, beam_to_dradec, beam_to_xygrid):
         dm_error               = 0.0,
         snr                    = float(row['snr']),
         rfi_prob               = 0.0,
-        timestamp_utc          = int(row['timestamp_utc']),
+        timestamp_utc          = timestamp_utc,
         tree_index             = int(row['tree_index']),
         snr_scale              = float(row['snr_scale']),
         spectral_index         = int(row['spectral_index']),
@@ -141,7 +143,7 @@ def _node_thread(node_id, assigned_beams, fits_files, server_addr,
 
             events = [
                 _row_to_proto_event(chunk_data[i], int(chunk_data['beam'][i]),
-                                    beam_to_dradec, beam_to_xygrid)
+                                    beam_to_dradec, beam_to_xygrid, frame0_nano)
                 for i in range(len(chunk_data))
             ]
 
