@@ -84,7 +84,7 @@ def _row_to_proto_event(row, beam, beam_to_dradec, beam_to_xygrid, frame0_nano):
     dra, ddec = beam_to_dradec[beam]
     gx, gy    = beam_to_xygrid[beam]
     # timestamp_utc in FITS is empty (zero); compute from frame0_nano and fpga_timestamp
-    timestamp_utc = frame0_nano/1000 + int(row['timestamp_fpga']) * 2.56
+    timestamp_utc = int(frame0_nano/1000 + int(row['timestamp_fpga']) * 2.56)
     return FrbEvent(
         beam_id                = beam,
         fpga_timestamp         = int(row['timestamp_fpga']),
