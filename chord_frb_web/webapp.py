@@ -2,6 +2,9 @@ from flask import Flask, request, make_response
 from .config import Config
 from flask import render_template
 import sys
+import time
+import json
+import numpy as np
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -23,6 +26,119 @@ def d3():
 @app.route('/mwe')
 def mwe():
     return render_template('mwe.html')
+
+@app.route('/fake-prometheus')
+def fake_prometheus():
+    return {
+    }
+
+@app.route('/fake-prometheus/api/v1/rules', methods=['POST'])
+def fake_Prometheus_rules():
+    return {}
+
+@app.route('/fake-prometheus/api/v1/label/__name__/values')
+def fake_prometheus_label():
+    return dict(status='success', data=['100','200'])
+
+@app.route('/fake-prometheus/api/v1/metadata')
+def fake_prometheus_metadata():
+    return dict(status='success',
+                data=dict(
+                    test=[dict(type='gauge', help='Test help text', unit='meters')],
+                    test2=[dict(type='gauge', help='Test2 help text', unit='kilograms')],
+                    ))
+
+@app.route('/fake-prometheus/api/v1/query', methods=['POST'])
+def fake_prometheus_query():
+    if request.method == 'POST':
+        print('Fake prometheus query data:', request.form)
+        if request.form.get('query') == 'test':
+
+            tnow = time.time()
+
+            metric = dict(__name__='test',
+                          job='prometheus',
+                          instance='chordfrb')
+            v1 = dict(metric=metric, value=[ [tnow, 42.], [tnow+1, 43.] ])
+            
+            return dict(status='success',
+                        data=dict(resultType='matrix',
+                                  result=[v1])
+                        )
+    return {}
+
+@app.route('/fake-prometheus/api/v1/query_range', methods=['GET', 'POST'])
+def fake_prometheus_query_range():
+    if request.method == 'POST':
+        args = request.form
+    else:
+        args = request.args
+    print('Fake prometheus query range:', args)
+    if args.get('query') == 'test':
+        tnow = time.time()
+        tnow = np.round(tnow, decimals=3)
+        
+        metric = dict(__name__='test')
+                      #job='prometheus',
+                      #instance='chordfrb')
+        v1 = dict(metric=metric, values=[ [tnow-10, "42."], [tnow, "43."] ])
+        rtn = dict(status='success',
+                   data=dict(resultType='matrix',
+                             result=[v1])
+                   )
+        print('Returning JSON:', json.dumps(rtn))
+        return rtn
+
+    if args.get('query') == 'test2':
+        tnow = time.time()
+        #tnow = np.round(tnow, decimals=3)
+        times = int(tnow) - 100 + np.arange(100)
+        times = [int(x) for x in times]
+        N = len(times)
+        
+        metric = dict(__name__='test2')
+        #job='prometheus',
+        #             instance='chordfrb')
+        #v1 = dict(metric=metric, values=[ [tnow-10, "142."], [tnow, "143."] ])
+        v1 = dict(metric=dict(__name__='test3a'),
+                  values=[[t, "%.1f"%f] for t,f in zip(times, np.random.uniform(low=0, high=200, size=N))])
+        rtn = dict(status='success',
+                   data=dict(resultType='matrix',
+                             result=[v1])
+                   )
+        print('Returning JSON:', json.dumps(rtn))
+        return rtn
+
+    if args.get('query') == 'test3':
+        tnow = time.time()
+        tnow = np.round(tnow, decimals=3)
+        
+        #job='prometheus',
+        #             instance='chordfrb')
+        times = int(tnow) - 100 + np.arange(100)
+        times = [int(x) for x in times]
+        N = len(times)
+        
+        v1 = dict(metric=dict(__name__='test3a'),
+                  values=[[t, "%.1f"%f] for t,f in zip(times, np.random.uniform(low=0, high=200, size=N))])
+        v2 = dict(metric=dict(__name__='test3b'),
+                  #values=[ [tnow-10, "200", "300"], [tnow, "300", "400"] ])
+                  #values=[ [tnow-10, "200"], [tnow, "300"] ])
+                  #values=list(zip(times, np.random.uniform(low=0, high=200, size=N))))
+                  values=[[t, "%.1f"%f] for t,f in zip(times, np.random.uniform(low=0, high=200, size=N))])
+        v3 = dict(metric=dict(__name__='test3c'),
+                  #values=[ [tnow-10, "1"], [tnow, "2"]])
+                  #values=list(zip(times, np.random.uniform(low=0, high=200, size=N))))
+                  values=[[t, "%.1f"%f] for t,f in zip(times, np.random.uniform(low=0, high=1, size=N))])
+        rtn = dict(status='success',
+                   data=dict(resultType='matrix',
+                             result=[v1,v2,v3])
+                   )
+        print('Returning JSON:', json.dumps(rtn))
+        return rtn
+        
+    return {}
+    
 
 @app.route('/beam-snr')
 def beam_snr():

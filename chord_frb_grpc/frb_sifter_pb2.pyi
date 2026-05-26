@@ -37,38 +37,24 @@ class FrbEvent(_message.Message):
     def __init__(self, beam_id: _Optional[int] = ..., fpga_timestamp: _Optional[int] = ..., dm: _Optional[float] = ..., dm_error: _Optional[float] = ..., snr: _Optional[float] = ..., rfi_prob: _Optional[float] = ...) -> None: ...
 
 class FrbEventsMessage(_message.Message):
-    __slots__ = ("has_injections", "beam_set_id", "chunk_fpga_count", "events")
+    __slots__ = ("has_injections", "beam_set_id", "chunk_fpga_count", "events", "coarsegrain_start_fpga_count", "coarsegrain_end_fpga_count", "coarsegrain_snr")
     HAS_INJECTIONS_FIELD_NUMBER: _ClassVar[int]
     BEAM_SET_ID_FIELD_NUMBER: _ClassVar[int]
     CHUNK_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_START_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_END_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_SNR_FIELD_NUMBER: _ClassVar[int]
     has_injections: bool
     beam_set_id: int
     chunk_fpga_count: int
     events: _containers.RepeatedCompositeFieldContainer[FrbEvent]
-    def __init__(self, has_injections: bool = ..., beam_set_id: _Optional[int] = ..., chunk_fpga_count: _Optional[int] = ..., events: _Optional[_Iterable[_Union[FrbEvent, _Mapping]]] = ...) -> None: ...
+    coarsegrain_start_fpga_count: int
+    coarsegrain_end_fpga_count: int
+    coarsegrain_snr: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, has_injections: bool = ..., beam_set_id: _Optional[int] = ..., chunk_fpga_count: _Optional[int] = ..., events: _Optional[_Iterable[_Union[FrbEvent, _Mapping]]] = ..., coarsegrain_start_fpga_count: _Optional[int] = ..., coarsegrain_end_fpga_count: _Optional[int] = ..., coarsegrain_snr: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class FrbEventsReply(_message.Message):
-    __slots__ = ("ok", "message")
-    OK_FIELD_NUMBER: _ClassVar[int]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
-    ok: bool
-    message: str
-    def __init__(self, ok: bool = ..., message: _Optional[str] = ...) -> None: ...
-
-class FrbBeamSNRMessage(_message.Message):
-    __slots__ = ("beam_set_id", "start_fpga_count", "end_fpga_count", "snr")
-    BEAM_SET_ID_FIELD_NUMBER: _ClassVar[int]
-    START_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
-    END_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
-    SNR_FIELD_NUMBER: _ClassVar[int]
-    beam_set_id: int
-    start_fpga_count: int
-    end_fpga_count: int
-    snr: _containers.RepeatedScalarFieldContainer[float]
-    def __init__(self, beam_set_id: _Optional[int] = ..., start_fpga_count: _Optional[int] = ..., end_fpga_count: _Optional[int] = ..., snr: _Optional[_Iterable[float]] = ...) -> None: ...
-
-class FrbBeamSNRReply(_message.Message):
     __slots__ = ("ok", "message")
     OK_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]

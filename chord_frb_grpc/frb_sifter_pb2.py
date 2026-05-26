@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10\x66rb_sifter.proto\":\n\rConfigMessage\x12\x13\n\x0bpirate_yaml\x18\x02 \x01(\t\x12\x14\n\x0cxengine_yaml\x18\x03 \x01(\t\"\x19\n\x0b\x43onfigReply\x12\n\n\x02ok\x18\x01 \x01(\x08\"p\n\x08\x46rbEvent\x12\x0f\n\x07\x62\x65\x61m_id\x18\x01 \x01(\x05\x12\x16\n\x0e\x66pga_timestamp\x18\x02 \x01(\x03\x12\n\n\x02\x64m\x18\x03 \x01(\x02\x12\x10\n\x08\x64m_error\x18\x04 \x01(\x02\x12\x0b\n\x03snr\x18\x05 \x01(\x02\x12\x10\n\x08rfi_prob\x18\x06 \x01(\x02\"t\n\x10\x46rbEventsMessage\x12\x16\n\x0ehas_injections\x18\x01 \x01(\x08\x12\x13\n\x0b\x62\x65\x61m_set_id\x18\x02 \x01(\x05\x12\x18\n\x10\x63hunk_fpga_count\x18\x03 \x01(\x03\x12\x19\n\x06\x65vents\x18\x04 \x03(\x0b\x32\t.FrbEvent\"-\n\x0e\x46rbEventsReply\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"g\n\x11\x46rbBeamSNRMessage\x12\x13\n\x0b\x62\x65\x61m_set_id\x18\x01 \x01(\x05\x12\x18\n\x10start_fpga_count\x18\x02 \x01(\x03\x12\x16\n\x0e\x65nd_fpga_count\x18\x03 \x01(\x03\x12\x0b\n\x03snr\x18\x04 \x03(\x02\".\n\x0f\x46rbBeamSNRReply\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2\xaa\x01\n\tFrbSifter\x12\x34\n\x12\x43heckConfiguration\x12\x0e.ConfigMessage\x1a\x0c.ConfigReply\"\x00\x12\x31\n\tFrbEvents\x12\x11.FrbEventsMessage\x1a\x0f.FrbEventsReply\"\x00\x12\x34\n\nFrbBeamSNR\x12\x12.FrbBeamSNRMessage\x1a\x10.FrbBeamSNRReply\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10\x66rb_sifter.proto\":\n\rConfigMessage\x12\x13\n\x0bpirate_yaml\x18\x02 \x01(\t\x12\x14\n\x0cxengine_yaml\x18\x03 \x01(\t\"\x19\n\x0b\x43onfigReply\x12\n\n\x02ok\x18\x01 \x01(\x08\"p\n\x08\x46rbEvent\x12\x0f\n\x07\x62\x65\x61m_id\x18\x01 \x01(\x05\x12\x16\n\x0e\x66pga_timestamp\x18\x02 \x01(\x03\x12\n\n\x02\x64m\x18\x03 \x01(\x02\x12\x10\n\x08\x64m_error\x18\x04 \x01(\x02\x12\x0b\n\x03snr\x18\x05 \x01(\x02\x12\x10\n\x08rfi_prob\x18\x06 \x01(\x02\"\xd7\x01\n\x10\x46rbEventsMessage\x12\x16\n\x0ehas_injections\x18\x01 \x01(\x08\x12\x13\n\x0b\x62\x65\x61m_set_id\x18\x02 \x01(\x05\x12\x18\n\x10\x63hunk_fpga_count\x18\x03 \x01(\x03\x12\x19\n\x06\x65vents\x18\x04 \x03(\x0b\x32\t.FrbEvent\x12$\n\x1c\x63oarsegrain_start_fpga_count\x18\x05 \x01(\x03\x12\"\n\x1a\x63oarsegrain_end_fpga_count\x18\x06 \x01(\x03\x12\x17\n\x0f\x63oarsegrain_snr\x18\x07 \x03(\x02\"-\n\x0e\x46rbEventsReply\x12\n\n\x02ok\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2t\n\tFrbSifter\x12\x34\n\x12\x43heckConfiguration\x12\x0e.ConfigMessage\x1a\x0c.ConfigReply\"\x00\x12\x31\n\tFrbEvents\x12\x11.FrbEventsMessage\x1a\x0f.FrbEventsReply\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,14 +37,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CONFIGREPLY']._serialized_end=105
   _globals['_FRBEVENT']._serialized_start=107
   _globals['_FRBEVENT']._serialized_end=219
-  _globals['_FRBEVENTSMESSAGE']._serialized_start=221
-  _globals['_FRBEVENTSMESSAGE']._serialized_end=337
-  _globals['_FRBEVENTSREPLY']._serialized_start=339
-  _globals['_FRBEVENTSREPLY']._serialized_end=384
-  _globals['_FRBBEAMSNRMESSAGE']._serialized_start=386
-  _globals['_FRBBEAMSNRMESSAGE']._serialized_end=489
-  _globals['_FRBBEAMSNRREPLY']._serialized_start=491
-  _globals['_FRBBEAMSNRREPLY']._serialized_end=537
-  _globals['_FRBSIFTER']._serialized_start=540
-  _globals['_FRBSIFTER']._serialized_end=710
+  _globals['_FRBEVENTSMESSAGE']._serialized_start=222
+  _globals['_FRBEVENTSMESSAGE']._serialized_end=437
+  _globals['_FRBEVENTSREPLY']._serialized_start=439
+  _globals['_FRBEVENTSREPLY']._serialized_end=484
+  _globals['_FRBSIFTER']._serialized_start=486
+  _globals['_FRBSIFTER']._serialized_end=602
 # @@protoc_insertion_point(module_scope)
