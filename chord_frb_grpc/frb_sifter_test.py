@@ -19,14 +19,17 @@ if __name__ == '__main__':
 
     sifter_addr = 'localhost:' + str(port)
 
-    yaml_config = {'config_item': 42, 'other_thing': 900.}
+    xengine_yaml_config = {'config_item': 42, 'other_thing': 900.}
+    xengine_yaml_config_str = yaml.dump(xengine_yaml_config)
 
-    yaml_config_str = yaml.dump(yaml_config)
+    pirate_yaml_config = {'config_item': 42, 'other_thing': 900.}
+    pirate_yaml_config_str = yaml.dump(pirate_yaml_config)
     
     # FRB Search node 1
     ch1 = grpc.insecure_channel(sifter_addr)
     stub1 = FrbSifterStub(ch1)
-    msg = ConfigMessage(yaml=yaml_config_str)
+    msg = ConfigMessage(xengine_yaml=xengine_yaml_config_str,
+                        pirate_yaml=pirate_yaml_config_str)
     r1 = stub1.CheckConfiguration(msg)
     print('Got config check result:', r1.ok)
     assert(r1.ok)
@@ -34,18 +37,21 @@ if __name__ == '__main__':
     # FRB Search node 2
     ch2 = grpc.insecure_channel(sifter_addr)
     stub2 = FrbSifterStub(ch2)
-    msg = ConfigMessage(yaml=yaml_config_str)
+    msg = ConfigMessage(xengine_yaml=xengine_yaml_config_str,
+                        pirate_yaml=pirate_yaml_config_str)
     r2 = stub2.CheckConfiguration(msg)
     print('Got config check result:', r2.ok)
     assert(r2.ok)
 
+    yaml_config = xengine_yaml_config.copy()
     yaml_config.update({'another_thing':17})
-    yaml_2 = yaml.dump(yaml_config)
+    xengine_yaml_2 = yaml.dump(yaml_config)
 
     # FRB Search node 3
     ch3 = grpc.insecure_channel(sifter_addr)
     stub3 = FrbSifterStub(ch3)
-    msg = ConfigMessage(yaml=yaml_2)
+    msg = ConfigMessage(xengine_yaml=xengine_yaml_2,
+                        pirate_yaml=pirate_yaml_config_str)
     r3 = stub3.CheckConfiguration(msg)
     print('Got config check result:', r3.ok)
     assert(not(r3.ok))
@@ -56,7 +62,8 @@ if __name__ == '__main__':
     msg = FrbEventsMessage(has_injections=not(injections),
                            beam_set_id = 1,
                            chunk_fpga_count = chunk_fpga,
-                           events = [])
+                           events = [],
+                           )
     r1 = stub1.FrbEvents(msg)
     print('Got FRB events reply:', r1.ok, r1.message)
     assert(not(r1.ok))

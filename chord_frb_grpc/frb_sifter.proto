@@ -52,6 +52,7 @@ message FrbEventsMessage {
   repeated FrbEvent events = 4;
 
   // Course-grained triggers (per beam; optional)
+  // Set the fpga-counts values to zero for no coarse-grained triggers
   int64 coarsegrain_start_fpga_count = 5;
   int64 coarsegrain_end_fpga_count = 6;
   // A (large) array of SNRs, the same length as the beams being handled by this beam_set_id.

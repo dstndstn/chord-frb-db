@@ -8,24 +8,39 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # SimpleQueue is thread-safe
         self.message_queue = queue.SimpleQueue()
         self.injections = injections
-        self.config = None
+        self.xengine_config = None
+        self.pirate_config = None
 
     def CheckConfiguration(self, request, context):
-        conf = request.yaml
         print('CheckConfiguration: context', context)
         print('  peer:', context.peer())
-        print('Received YAML config: "%s"' % conf)
+        conf = request.xengine_yaml
+        print('Received Xengine YAML config: "%s"' % conf)
         ok = True
-        if self.config is None:
-            self.config = conf
+        if self.xengine_config is None:
+            self.xengine_config = conf
         else:
-            if self.config == conf:
-                pass
-            else:
-                print('YAML config mismatch!')
+            if not self.check_xengine_config(conf):
+                print('YAML config mismatch (Xengine)!')
+                ok = False
+        conf = request.pirate_yaml
+        print('Received Pirate YAML config: "%s"' % conf)
+        if self.pirate_config is None:
+            self.pirate_config = conf
+        else:
+            if not self.check_pirate_config(conf):
+                print('YAML config mismatch (Pirate)!')
                 ok = False
         r = ConfigReply(ok=ok)
         return r
+
+    def check_xengine_config(self, conf):
+        # Demand exact equality... what could go wrong
+        return conf == self.xengine_config
+
+    def check_pirate_config(self, conf):
+        # Demand exact equality... what could go wrong
+        return conf == self.pirate_config
 
     def FrbEvents(self, request, context):
         print('FRB Events')
@@ -38,7 +53,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_count, 'with', len(request.events), 'events')
         for e in request.events:
             print('  event', e)
-        
+
+        print('Coarse-grained array FPGA-count start & stop',
+              request.coarsegrain_start_fpga_count,
+              request.coarsegrain_end_fpga_count)
+        print('Coarse-grained array length:', len(request.coarsegrain_snr))
+            
         return FrbEventsReply(ok=ok, message=msg)
 
 def serve(sifter, port=50051, max_threads=10):
