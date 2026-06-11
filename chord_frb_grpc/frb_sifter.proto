@@ -20,6 +20,8 @@ service FrbSifter {
 message ConfigMessage {
   string pirate_yaml = 2;
   string xengine_yaml = 3;
+  string dedispersion_plan_yaml = 4;
+  string grouper_yaml = 5;
 }
 
 message ConfigReply {

@@ -61,7 +61,7 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             
         return FrbEventsReply(ok=ok, message=msg)
 
-def serve(sifter, port=50051, max_threads=10):
+def serve(sifter, port=10000, max_threads=10):
     import grpc
     from concurrent import futures
     #from chord_frb_grpc import frb_sifter_pb2_grpc

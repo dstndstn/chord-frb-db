@@ -7,12 +7,16 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ConfigMessage(_message.Message):
-    __slots__ = ("pirate_yaml", "xengine_yaml")
+    __slots__ = ("pirate_yaml", "xengine_yaml", "dedispersion_plan_yaml", "grouper_yaml")
     PIRATE_YAML_FIELD_NUMBER: _ClassVar[int]
     XENGINE_YAML_FIELD_NUMBER: _ClassVar[int]
+    DEDISPERSION_PLAN_YAML_FIELD_NUMBER: _ClassVar[int]
+    GROUPER_YAML_FIELD_NUMBER: _ClassVar[int]
     pirate_yaml: str
     xengine_yaml: str
-    def __init__(self, pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ...) -> None: ...
+    dedispersion_plan_yaml: str
+    grouper_yaml: str
+    def __init__(self, pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ..., dedispersion_plan_yaml: _Optional[str] = ..., grouper_yaml: _Optional[str] = ...) -> None: ...
 
 class ConfigReply(_message.Message):
     __slots__ = ("ok",)
