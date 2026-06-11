@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import frb_sifter_pb2 as frb__sifter__pb2
+from chord_frb_grpc import frb_sifter_pb2 as chord__frb__grpc_dot_frb__sifter__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in frb_sifter_pb2_grpc.py depends on'
+        + ' but the generated code in chord_frb_grpc/frb_sifter_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,13 +36,13 @@ class FrbSifterStub(object):
         """
         self.CheckConfiguration = channel.unary_unary(
                 '/FrbSifter/CheckConfiguration',
-                request_serializer=frb__sifter__pb2.ConfigMessage.SerializeToString,
-                response_deserializer=frb__sifter__pb2.ConfigReply.FromString,
+                request_serializer=chord__frb__grpc_dot_frb__sifter__pb2.ConfigMessage.SerializeToString,
+                response_deserializer=chord__frb__grpc_dot_frb__sifter__pb2.ConfigReply.FromString,
                 _registered_method=True)
         self.FrbEvents = channel.unary_unary(
                 '/FrbSifter/FrbEvents',
-                request_serializer=frb__sifter__pb2.FrbEventsMessage.SerializeToString,
-                response_deserializer=frb__sifter__pb2.FrbEventsReply.FromString,
+                request_serializer=chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsMessage.SerializeToString,
+                response_deserializer=chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsReply.FromString,
                 _registered_method=True)
 
 
@@ -72,13 +72,13 @@ def add_FrbSifterServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CheckConfiguration': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckConfiguration,
-                    request_deserializer=frb__sifter__pb2.ConfigMessage.FromString,
-                    response_serializer=frb__sifter__pb2.ConfigReply.SerializeToString,
+                    request_deserializer=chord__frb__grpc_dot_frb__sifter__pb2.ConfigMessage.FromString,
+                    response_serializer=chord__frb__grpc_dot_frb__sifter__pb2.ConfigReply.SerializeToString,
             ),
             'FrbEvents': grpc.unary_unary_rpc_method_handler(
                     servicer.FrbEvents,
-                    request_deserializer=frb__sifter__pb2.FrbEventsMessage.FromString,
-                    response_serializer=frb__sifter__pb2.FrbEventsReply.SerializeToString,
+                    request_deserializer=chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsMessage.FromString,
+                    response_serializer=chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -106,8 +106,8 @@ class FrbSifter(object):
             request,
             target,
             '/FrbSifter/CheckConfiguration',
-            frb__sifter__pb2.ConfigMessage.SerializeToString,
-            frb__sifter__pb2.ConfigReply.FromString,
+            chord__frb__grpc_dot_frb__sifter__pb2.ConfigMessage.SerializeToString,
+            chord__frb__grpc_dot_frb__sifter__pb2.ConfigReply.FromString,
             options,
             channel_credentials,
             insecure,
@@ -133,8 +133,8 @@ class FrbSifter(object):
             request,
             target,
             '/FrbSifter/FrbEvents',
-            frb__sifter__pb2.FrbEventsMessage.SerializeToString,
-            frb__sifter__pb2.FrbEventsReply.FromString,
+            chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsMessage.SerializeToString,
+            chord__frb__grpc_dot_frb__sifter__pb2.FrbEventsReply.FromString,
             options,
             channel_credentials,
             insecure,
