@@ -5,7 +5,7 @@ sidelobes.
 """
 
 from chord_frb_sifter.actors import Actor
-from chord_frb_sifter.chord import Chord
+from chord_frb_sifter.chord_telescope import ChordTelescope
 
 import numpy as np
 from datetime import datetime
@@ -39,7 +39,7 @@ class BrightPulsarSifter(Actor):
             '../config', 
             'testChordTelescope.yaml'
         ),'r'), Loader=yaml.Loader)
-        self.tele = Chord(conf["telescope"])
+        self.tele = ChordTelescope(conf["telescope"])
 
     def _perform_action(self, event):
   
@@ -51,7 +51,7 @@ class BrightPulsarSifter(Actor):
         # cfbm.config.chime.date = t
         # lst = cfbm.config.chime.sidereal_time() * (12 / np.pi) # radians -> hours
 
-        # astropy version using Chord object for telescope location
+        # astropy version using ChordTelescope object for telescope location
         loc = EarthLocation(
             lat=self.tele.origin_itrs_lat_deg, 
             lon=self.tele.origin_itrs_lon_deg
