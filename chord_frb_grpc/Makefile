@@ -10,8 +10,12 @@ all: $(HELLO)
 SIFTER := frb_sifter_pb2.py frb_sifter_pb2.pyi frb_sifter_pb2_grpc.py
 all: $(SIFTER)
 
+# frb_sifter: set the package name in the generated python files.
+frb_sifter_pb2.py frb_sifter_pb2.pyi frb_sifter_pb2_grpc.py: frb_sifter.proto
+	(cd .. && python -m grpc_tools.protoc -Ichord_frb_grpc=chord_frb_grpc --python_out=. --pyi_out=. --grpc_python_out=. chord_frb_grpc/$<)
+
 %_pb2.py %_pb2.pyi %_pb2_grpc.py: %.proto
-	python -m grpc_tools.protoc -I=. --python_out=. --pyi_out=. --grpc_python_out=. $<
+	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. $<
 
 CPPTEST := cpptest
 all: $(CPPTEST)
