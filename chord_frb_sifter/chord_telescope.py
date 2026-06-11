@@ -6,7 +6,7 @@ import astropy.units as u
 class Telescope(object):
     pass
 
-class Chord(Telescope):
+class ChordTelescope(Telescope):
     # With reference to Geoff Ryan's document on CHORD coordinate systems,
     # specifically Fig 6;
     # https://www.overleaf.com/project/655bb79463f7ccf32c834e5d
@@ -104,7 +104,7 @@ if __name__ == '__main__':
     conf = yaml.load(open(os.path.join(os.path.dirname(__file__), 'config', 'testChordTelescope.yaml'),
                           'r'), Loader=Loader)
     tele = conf['telescope']
-    chord = Chord(tele)
+    chord = ChordTelescope(tele)
 
     print('Dish coelevation:', chord.dish_coelev_deg, 'deg')
 
