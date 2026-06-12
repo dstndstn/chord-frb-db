@@ -11,6 +11,10 @@ except ImportError:
     from yaml import Loader, Dumper
 from datetime import datetime
 
+from sqlalchemy.orm import Session
+from chord_frb_db.models import PirateConfig, BeamSNR
+
+
 '''
 This script opens a gRPC server socket listening for connections from Pirate.
 It loads the pipeline and sends any events it receives through the pipeline.
@@ -78,9 +82,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             if beamset in self.beamset_meta:
                 print('Already received beamset %i' % beamset)
                 return False
-            self.beamset[beamset] = (conf['beam_ids'],
-                                     conf['beam_positions_x'],
-                                     conf['beam_positions_y'])
+            self.beamset_meta[beamset] = (conf['beam_ids'],
+                                          conf['beam_positions_x'],
+                                          conf['beam_positions_y'])
 
         else:
             # Demand exact equality... what could go wrong
@@ -149,47 +153,71 @@ def event_handler(sifter, event_queue, pipeline):
 
 def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()
-    while True:
-        beam_snr = beam_snr_queue.get()
-        #print('beam_snr_handler: got', len(beam_snr))
-        #beamset, fpga_start, fpga_end, snr_array = beam_snr
-        beamset = beam_snr['beamset']
-        fpga_start = beam_snr['fpga_start']
-        fpga_end = beam_snr['fpga_end']
-        peer = beam_snr['peer']
-        snr_array = beam_snr['beam_snr']
-        if beamset not in known_beamsets:
-            # Add a database entry describing this beamset: beam ids, x,y locations,
-            # peer?, unix_nano0, date of first message?
-            print('Looking up beamset', beamset, 'in xengine YAML...')
-            print(sifter.xengine_config)
+    pirate_configs = {}
 
-            if not beamset in sifter.beamset_meta:
-                print('Unknown beamset', beamset)
-                continue
+    with Session(database) as session:
+        while True:
+            beam_snr = beam_snr_queue.get()
+            #print('beam_snr_handler: got', len(beam_snr))
+            #beamset, fpga_start, fpga_end, snr_array = beam_snr
+            beamset = beam_snr['beamset']
+            fpga_start = beam_snr['fpga_start']
+            fpga_end = beam_snr['fpga_end']
+            peer = beam_snr['peer']
+            snr_array = beam_snr['beam_snr']
+            if beamset not in known_beamsets:
+                # Add a database entry describing this beamset: beam ids, x,y locations,
+                # peer?, unix_nano0, date of first message?
+                print('Looking up beamset', beamset, 'in xengine YAML...')
+                print(sifter.xengine_config)
+    
+                if not beamset in sifter.beamset_meta:
+                    print('Unknown beamset', beamset)
+                    continue
+    
+                # arrays
+                beam_id, beam_x, beam_y = sifter.beamset_meta[beamset]
+    
+                # Add beamset, beam_ids, beam_x, beam_y to the db!
+                pc = PirateConfig(beamset=beamset,
+                                  start_time=datetime.now(),   # ???
+                                  xengine_config=sifter.xengine_config_yaml,
+                                  pirate_config=sifter.pirate_config,
+                                  beam_x=beam_x,
+                                  beam_y=beam_y,
+                                  beam_id=beam_id)
+                session.add(pc)
+                session.flush()
+                print('Saved PirateConfig to database: id', pc.id)
+                session.commit()
+                pirate_configs[beamset] = pc.id
 
-            beam_ids, beam_x, beam_y = sifter.beamset_meta[beamset]
-
-            # Add beamset, beam_ids, beam_x, beam_y to the db!
-            known_beamsets.add(beamset)
-
-            # timing ... this only needs to get initialized once!
-            xengine = sifter.xengine_config
-            seq_per_frb_time_sample = xengine['seq_per_frb_time_sample']
-            fpga0_nano = xengine['unix_ns_at_seq_0']
-            nano_per_fpga = xengine['dt_ns_per_seq']
-            print('FPGA seq per time sample:', seq_per_frb_time_sample)
-            print('nanoseconds per FPGA seq:', nano_per_fpga)
-
-        unix_time_nano_start = fpga0_nano + fpga_start * nano_per_fpga
-        unix_time_nano_end   = fpga0_nano + fpga_end   * nano_per_fpga
-        nano = 1_000_000_000
-        date_start = datetime.fromtimestamp(unix_time_nano_start // nano +
-                                            1e-9 * (unix_time_nano_start % nano))
-        date_end = datetime.fromtimestamp(unix_time_nano_end // nano +
-                                          1e-9 * (unix_time_nano_end % nano))
-
-        # Add beamset, date_start, date_end, snr_array to the db!
+                known_beamsets.add(beamset)
+    
+                # timing ... this only needs to get initialized once!
+                xengine = sifter.xengine_config
+                seq_per_frb_time_sample = xengine['seq_per_frb_time_sample']
+                fpga0_nano = xengine['unix_ns_at_seq_0']
+                nano_per_fpga = xengine['dt_ns_per_seq']
+                print('FPGA seq per time sample:', seq_per_frb_time_sample)
+                print('nanoseconds per FPGA seq:', nano_per_fpga)
+    
+            unix_time_nano_start = fpga0_nano + fpga_start * nano_per_fpga
+            unix_time_nano_end   = fpga0_nano + fpga_end   * nano_per_fpga
+            nano = 1_000_000_000
+            date_start = datetime.fromtimestamp(unix_time_nano_start // nano +
+                                                1e-9 * (unix_time_nano_start % nano))
+            date_end = datetime.fromtimestamp(unix_time_nano_end // nano +
+                                              1e-9 * (unix_time_nano_end % nano))
+    
+            # Add beamset, date_start, date_end, snr_array to the db!
+            bs = BeamSNR(pirate_config_id=pirate_configs[beamset],
+                         timestamp=date_start,
+                         beam_snr=snr_array)
+            session.add(bs)
+            session.flush()
+            print('Saved BeamSNR to database: id', bs.id)
+            session.commit()
 
 '''
 Example xengine metadata:
