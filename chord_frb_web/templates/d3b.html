@@ -2,8 +2,9 @@
 <html>
   <head><title>D3 test</title></head>
   <body>
-  <h1>D3 Test</h1>
+    <h1>X-engine simulator &rarr; Pirate &rarr; Sifter &rarr; Database &rarr; Visualization</h1>
 
+Time: <span id="beam_time_display">xxx</span><br/>
     <div id="myplot"></div>
     <div id="timeslider_div">
     Time: <span id="time_display">xxx</span><br/>
@@ -19,7 +20,12 @@ function delay(ms) {
 }
 
 const snr_min = 0.;
-const snr_max = 10.;
+const snr_max = 100.;
+const beam_x_range = [-0.2, +0.2];
+const beam_y_range = [-0.2, +0.2];
+
+//const beam_x_range = [-2.5, +2.5];
+//const beam_y_range = [-2.5, +2.5];
 
 function get_color(snr) {
     const t = (snr - snr_min) / (snr_max - snr_min);
@@ -27,66 +33,64 @@ function get_color(snr) {
     //return d3.interpolateTurbo(t);
 }
 
-const timeslider = document.querySelector("#time_slider");
-const timedisplay = document.querySelector("#time_display");
-timedisplay.textContent = timeslider.value;
-timeslider.addEventListener("input", (event) => {
-    timedisplay.textContent = event.target.value;
-});
+function update_plot(data) {
+    const N = data["beam_x"].length;
+    var newValues = data["sn_cg"];
 
-//const data = await d3.json("static/snr_cg_5.json");
-//const data = await d3.json("static/snr_cg_4.json");
-const data = await d3.json("static/snr_cg.json");
-const N = data["beam_x"].length;
+    const dot = document.querySelector(".dot_plot_class");
+    console.log("querySelector: " + dot);
+    const kids = dot.children;
+    console.log("children: " + kids);
+    console.log("length: " + kids.length);
 
-console.log("data length: " + N);
+    for (var i=0; i<N; i++) {
+	if (i == 0) {
+	    console.log("kid: " + kids[i]);
+	    for (const k in kids[i]) {
+		console.log("key: " + k + " = " + kids[i][k]);
+	    }
+	    console.log("dataset: " + kids[i]["dataset"]);
+	    for (const k in kids[i]["dataset"]) {
+		console.log("dataset : " + k + " = " + kids[i]["dataset"][k]);
+	    }
+	    console.log("getAttributeNames: " + kids[i].getAttributeNames());
+	    console.log("getAttribute fill: " + kids[i].getAttribute("fill"));
+	    console.log("getAttribute cx: " + kids[i].getAttribute("cx"));
+	    console.log("getAttribute cy: " + kids[i].getAttribute("cy"));
 
-var tooltips = [];
-for (var i=0; i<N; i++) {
-    tooltips.push(
-	"Beam: " + (i+1) + "\n" +
-	    "SN: " + data["sn_cg"][i].toFixed(2)
-    );
+	    var cc = get_color(newValues[i]);
+	    console.log("new color: " + cc);
+	    kids[i].setAttribute("fill", cc);
+	}
+	// Gotta love an arbitrary, undocumented level of indirection!
+	var index = kids[i]["__data__"];
+	//var cc = get_color(newValues[i]);
+	var cc = get_color(newValues[index]);
+	kids[i].setAttribute("fill", cc);
+	//kids[i]["fill"] = "#ff0000";
+	//kids[i].style.foregroundColor = "red";
+	//kids[i].style.fill = "red";
+    }
 }
 
-var beam_size = [];
-for (var i=0; i<N; i++) {
-    beam_size.push(2 + 8*Math.sqrt(i / N));
-}
-
-//function create_plot() {
+function create_plot(data) {
     const dot_plot = Plot.dot(
 	{ length: data["beam_x"].length },
 	{
 	    x: data["beam_x"],
 	    y: data["beam_y"],
-	    r: beam_size,
+	    //r: beam_size,
+	    r: 20,//data["beam_size"],
 	    //stroke: data["sn_cg"],
 	    fill: data["sn_cg"],
 	    //fillOpacity: 0.5,
 	    //mixBlendMode: "lighten",
 	    //pointerEvents: "fill",
 	    //scheme: "magma",
-
-	    /*
-	    render: (i, s, v, d, c, next) => {
-		console.log("render() called");
-		const g = next(i, s, v, d, c);
-		c.ownerSVGElement.update = (values) =>
-		d3
-		    .select(g)
-		    .selectAll("circle")
-		//.transition()
-		//.duration(750)
-		    .attr("fill", (i) => s.color(values[i]));
-		return g;
-		}
-		*/
 	});
 
     dot_plot["id"] = "dot_plot";
     dot_plot["className"] = "dot_plot_class";
-    //console.log("children: " + dot_plot.children.length);
     console.log("data: " + dot_plot["data"].length);
 
     const plot = Plot.plot({
@@ -99,29 +103,71 @@ for (var i=0; i<N; i++) {
 	       },
 	// enforce radius range?
 	//r: {range: [2, 10]},
-	x: {domain: [-2.5, +2.5]},
-	y: {domain: [-2.5, +2.5]},
+	x: {domain: beam_x_range},
+	y: {domain: beam_y_range},
 	clip: false,
 	marks: [
 	    Plot.frame(),
 	    dot_plot,
 	    // red dot that follows the cursor
-	    Plot.dot({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red", r: 8})),
+	    Plot.dot({length: data["beam_x"].length},
+		     Plot.pointer({x: data["beam_x"], y: data["beam_y"], stroke: "red",
+				   r: 8
+				   //r: data["beam_size"],
+				  })),
 	    // tooltip
-	    Plot.tip({length: data["beam_x"].length}, Plot.pointer({x: data["beam_x"], y: data["beam_y"],
-								    //filter: (d) => d.info,
-								    //title: func,
-								    title: tooltips,
-								   })),
+	    Plot.tip({length: data["beam_x"].length},
+		     Plot.pointer({x: data["beam_x"], y: data["beam_y"],
+				   //filter: (d) => d.info,
+				   //title: func,
+				   title: data["tooltips"],
+				  })),
 	    //data["sn_cg"]})), //(d) => [d.name, d.info].join("\n\n")})),
 	    //sn: data["sn_cg"]})),
 	    // crosshairs
-	    Plot.crosshair({length: data["beam_x"].length}, {x: data["beam_x"], y: data["beam_y"]}),
+	    Plot.crosshair({length: data["beam_x"].length},
+			   {x: data["beam_x"], y: data["beam_y"]}),
 	],
     });
+    return plot;
+}
+  
+const timeslider = document.querySelector("#time_slider");
+const timedisplay = document.querySelector("#time_display");
+timedisplay.textContent = timeslider.value;
+timeslider.addEventListener("input", (event) => {
+    timedisplay.textContent = event.target.value;
+});
 
-//return plot;
-//}
+const beam_time_display = document.querySelector("#beam_time_display");
+
+//const data = await d3.json("static/snr_cg_5.json");
+//const data = await d3.json("static/snr_cg_4.json");
+//const data = await d3.json("static/snr_cg.json");
+//const N = data["beam_x"].length;
+//console.log("data length: " + N);
+
+function set_derived_data(data) {
+    const N = data["beam_x"].length;
+    var beam_ids = data["beam_id"];
+    var tooltips = [];
+    for (var i=0; i<N; i++) {
+	//var beam_id = i+1;
+	var beam_id = beam_ids[i];
+	tooltips.push(
+	    "Beam: " + beam_id + "\n" +
+		"SN: " + data["sn_cg"][i].toFixed(2)
+	);
+    }
+    var beam_size = [];
+    for (var i=0; i<N; i++) {
+	//beam_size.push(2 + 8*Math.sqrt(i / N));
+	beam_size.push(50);
+    }
+    data["tooltips"] = tooltips;
+    data["beam_size"] = beam_size;
+}
+
 
 //var transposed = [];
 //for (var i=0; i<data["beam_x"].length; i++) {
@@ -130,13 +176,68 @@ for (var i=0; i<N; i++) {
 
 //var plot = create_plot();
 const div = document.querySelector("#myplot");
-div.append(plot);
+//div.append(plot);
+
+var plot = null;
 
 // Animation loop
-{
+do {
+
+    const jdata = await d3.json("/beam-max-snr/latest");
+    // the structure of "jdata" is a list of beamsets along with parallel data:
+    // "beamsets" (int)
+    // "timestamps" (date)
+    // "timestamps_nano" (float)
+    // "beam_ids" (int array)
+    // "beam_xs" (float array)
+    // "beam_ys" (float array)
+    // "beam_snrs" (float array)
+
+    var latest_timestamp = 0n;
+    var data = {};
+    data["beam_x"] = [];
+    data["beam_y"] = [];
+    data["sn_cg"] = [];
+    data["beam_id"] = [];
+    var J = jdata["beamsets"].length;
+    console.log("Got " + J + " beamsets");
+    for (var j=0; j<J; j++) {
+	//K = jdata["beam_snrs"].length;
+	//for (var k=0; k<K; k++) {
+	//}
+	// extend arrays
+	data["beam_x"].push(...jdata["beam_xs"][j]);
+	data["beam_y"].push(...jdata["beam_ys"][j]);
+	data["beam_id"].push(...jdata["beam_ids"][j]);
+	data["sn_cg"].push(...jdata["beam_snrs"][j]);
+
+	var tn = jdata["timestamps_nano"][j];
+	tn = BigInt(tn);
+	if (tn > latest_timestamp)
+	    latest_timestamp = tn;
+    }
+    set_derived_data(data);
+
+    var ts = Temporal.Instant.fromEpochNanoseconds(latest_timestamp);
+    var ts_str = ts.toZonedDateTimeISO("UTC");
+    beam_time_display.textContent = ts_str;
+
+    const newplot = create_plot(data);
+
+    if (plot) {
+	plot.remove();
+    }
+    div.append(newplot);
+    plot = newplot;
+
+
     
     console.log("delay...");
-    await delay(3000);
+    await delay(2000);
+} while (true);
+
+
+/*
 
     console.log("plot: " + plot);
     console.log("dot_plot: " + dot_plot);
@@ -160,117 +261,33 @@ div.append(plot);
 	for (var i=0; i<N; i++) {
 	    newValues.push(snr_min + (snr_max - snr_min) * i / (N-1));
 	}
-
 	console.log("update plot...");
-
 	for (var i=0; i<N; i++) {
 	    data["sn_cg"][i] = newValues[i];
 	}
 
-	const dot = document.querySelector(".dot_plot_class");
-	console.log("querySelector: " + dot);
-	const kids = dot.children;
-	console.log("children: " + kids);
-	console.log("length: " + kids.length);
+	// We can either update the plot in-place:
+	//update_plot(data);
 
-	for (var i=0; i<N; i++) {
-	    if (i == 0) {
-		console.log("kid: " + kids[i]);
-		for (const k in kids[i]) {
-		    console.log("key: " + k + " = " + kids[i][k]);
-		}
-		console.log("dataset: " + kids[i]["dataset"]);
-		for (const k in kids[i]["dataset"]) {
-		    console.log("dataset : " + k + " = " + kids[i]["dataset"][k]);
-		}
-		console.log("getAttributeNames: " + kids[i].getAttributeNames());
-		console.log("getAttribute fill: " + kids[i].getAttribute("fill"));
-		console.log("getAttribute cx: " + kids[i].getAttribute("cx"));
-		console.log("getAttribute cy: " + kids[i].getAttribute("cy"));
+	// ... Or... create a new plot and swap it in.
 
-		var cc = get_color(newValues[i]);
-		console.log("new color: " + cc);
-		kids[i].setAttribute("fill", cc);
-
-		//for (const prop in kids[i].style) {
-		//    console.log("style." + prop + " = " + kids[i].style[prop]);
-		//}
-	    }
-
-	    // Gotta love an arbitrary, undocumented level of indirection!
-	    var index = kids[i]["__data__"];
-	    //var cc = get_color(newValues[i]);
-	    var cc = get_color(newValues[index]);
-	    kids[i].setAttribute("fill", cc);
-
-	    //kids[i]["fill"] = "#ff0000";
-	    //kids[i].style.foregroundColor = "red";
-	    //kids[i].style.fill = "red";
-	    
-	}
-
-	//const newplot = create_plot();
-	//plot.remove()
-	//div.append(newplot);
-	//plot = newplot;
+	const newplot = create_plot();
+	plot.remove()
+	div.append(newplot);
+	plot = newplot;
 
 	//await dot_plot.update(newValues).end();
 	//await Promises.delay(1300);
 	console.log("delay");
 	await delay(3000);
-	break;
+	//break;
     } while (true);
 }
-
+*/
 
 
 
 </script>
-
-{# Vanilla D3
-<div id="container"></div>
-<script type="module">
-
-  // Declare the chart dimensions and margins.
-  const width = 640;
-  const height = 400;
-  const marginTop = 20;
-  const marginRight = 20;
-  const marginBottom = 30;
-  const marginLeft = 40;
-
-  // Declare the x (horizontal position) scale.
-  const x = d3.scaleUtc()
-	.domain([new Date("2023-01-01"), new Date("2024-01-01")])
-	.range([marginLeft, width - marginRight]);
-
-  // Declare the y (vertical position) scale.
-  const y = d3.scaleLinear()
-	.domain([0, 100])
-	.range([height - marginBottom, marginTop]);
-
-  // Create the SVG container.
-  const svg = d3.create("svg")
-	.attr("width", width)
-	.attr("height", height);
-
-  // Add the x-axis.
-  svg.append("g")
-    .attr("transform", `translate(0,${height - marginBottom})`)
-    .call(d3.axisBottom(x));
-
-  // Add the y-axis.
-  svg.append("g")
-    .attr("transform", `translate(${marginLeft},0)`)
-    .call(d3.axisLeft(y));
-
-  // Append the SVG element.
-  container.append(svg.node());
-
-
- 
-</script>
-#}
 
   </body>
 </html>

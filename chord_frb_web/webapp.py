@@ -51,6 +51,7 @@ def beam_max_snr():
 
     beamsets = []
     timestamps = []
+    timestamps_nano = []
     beam_ids = []
     beam_xs = []
     beam_ys = []
@@ -70,13 +71,16 @@ def beam_max_snr():
 
         beamsets.append(pirate.beamset)
         timestamps.append(beamsnr.timestamp)
+        timestamps_nano.append(str(int(beamsnr.timestamp.timestamp() * 1e9)))
         beam_ids.append(pirate.beam_id)
         beam_xs.append(pirate.beam_x)
         beam_ys.append(pirate.beam_y)
         beam_snrs.append(beamsnr.beam_snr)
-            
+
+    # Return JSON:
     return dict(beamsets=beamsets,
                 timestamps=timestamps,
+                timestamps_nano=timestamps_nano,
                 beam_ids=beam_ids,
                 beam_xs=beam_xs,
                 beam_ys=beam_ys,
