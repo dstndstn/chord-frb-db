@@ -175,6 +175,8 @@ class BeamSNR(Base):
     id:          Mapped[int] = mapped_column(primary_key=True)
     # PirateConfig
     pirate_config_id: Mapped[int] = mapped_column(ForeignKey("pirate_config.id"))
+    pirate_config:    Mapped['PirateConfig'] = relationship()#back_populates='events')
+
     # timestamp
     timestamp: Mapped[datetime]# = mapped_column(DateTime)
     # beam_snr
