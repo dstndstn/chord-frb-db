@@ -32,22 +32,18 @@ class BrightPulsarSifter(Actor):
 
         self.tele = ChordTelescope(config.chord_config.telescope)
 
+        # astropy version using ChordTelescope object for telescope location
+        self.loc = EarthLocation(
+            lat=self.tele.origin_itrs_lat_deg, 
+            lon=self.tele.origin_itrs_lon_deg
+            )
+
     def _perform_action(self, event):
   
         dm = event['dm']
         t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
 
-        # # Getting LST from ephem object for CHIME in cfbm. Bit clunky.
-        # # Repalce w/ astropy or some CHORD utility?
-        # cfbm.config.chime.date = t
-        # lst = cfbm.config.chime.sidereal_time() * (12 / np.pi) # radians -> hours
-
-        # astropy version using ChordTelescope object for telescope location
-        loc = EarthLocation(
-            lat=self.tele.origin_itrs_lat_deg, 
-            lon=self.tele.origin_itrs_lon_deg
-            )
-        lst = Time(t, scale='utc', location=loc).sidereal_time('apparent').hour
+        lst = Time(t, scale='utc', location=self.loc).sidereal_time('apparent').hour
 
         for pulsar, params in self.bright_pulsars.items():
             ha = lst - params['ra']
