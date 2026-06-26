@@ -21,6 +21,7 @@ class BrightPulsarSifter(Actor):
     """
 
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Only a few pulsars that are bright enough to be detected in sidelobes.
         # If the list grows significantly, consider loading from config file or DB.
         self.bright_pulsars = {
