@@ -1,8 +1,10 @@
+from datetime import datetime
+
 from sqlalchemy.orm import DeclarativeBase
 from typing import List
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Table, Column, Integer, String, SmallInteger, BigInteger, Double, REAL, ForeignKey, Float, Boolean
+from sqlalchemy import Table, Column, Integer, String, SmallInteger, BigInteger, Double, REAL, ForeignKey, Float, Boolean, DateTime, ARRAY
 
 import numpy as np
 
@@ -139,6 +141,45 @@ class KnownSource(Base):
     def __str__(self):
         return ('KnownSource: %s, %s, RA,Dec %.4f,%.4f, DM %.2f' %
                 (self.name, self.source_type, self.ra, self.dec, self.dm))
+
+'''
+Populated by the sifter from info it receives in the first message from a Pirate
+instance.
+'''
+class PirateConfig(Base):
+    __tablename__ = 'pirate_config'
+    id:          Mapped[int] = mapped_column(primary_key=True)
+    # beamset
+    beamset:     Mapped[int]
+    # start_time
+    start_time:  Mapped[datetime]
+    # xengine_config
+    xengine_config: Mapped[str]  # = mapped_column(String(10240))
+    # pirate_config
+    pirate_config: Mapped[str]  # = mapped_column(String(10240))
+    # beam_x
+    beam_x: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
+    # beam_y
+    beam_y: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
+    # beam_id
+    beam_id: Mapped[List[int]] = mapped_column(ARRAY(Integer, dimensions=1, zero_indexes=True))
+
+'''
+This is populated by the sifter, by periodically dumping the max SN received per
+beam, from each Pirate instance (beamset).  That is, in each reporting period
+there will be ~28 BeamSNR entries, one per beamset, with the same timestamp.
+If a Pirate does not report, it gets no entry(?)
+'''
+class BeamSNR(Base):
+    __tablename__ = 'beam_snr'
+    id:          Mapped[int] = mapped_column(primary_key=True)
+    # PirateConfig
+    pirate_config_id: Mapped[int] = mapped_column(ForeignKey("pirate_config.id"))
+    # timestamp
+    timestamp: Mapped[datetime]# = mapped_column(DateTime)
+    # beam_snr
+    beam_snr: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
+
 class DumbTest(Base):
     __tablename__ = 'dumb_test'
     id:   Mapped[int] = mapped_column(primary_key=True)

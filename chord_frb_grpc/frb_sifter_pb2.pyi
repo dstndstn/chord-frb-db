@@ -7,10 +7,16 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class ConfigMessage(_message.Message):
-    __slots__ = ("yaml",)
-    YAML_FIELD_NUMBER: _ClassVar[int]
-    yaml: str
-    def __init__(self, yaml: _Optional[str] = ...) -> None: ...
+    __slots__ = ("pirate_yaml", "xengine_yaml", "dedispersion_plan_yaml", "grouper_yaml")
+    PIRATE_YAML_FIELD_NUMBER: _ClassVar[int]
+    XENGINE_YAML_FIELD_NUMBER: _ClassVar[int]
+    DEDISPERSION_PLAN_YAML_FIELD_NUMBER: _ClassVar[int]
+    GROUPER_YAML_FIELD_NUMBER: _ClassVar[int]
+    pirate_yaml: str
+    xengine_yaml: str
+    dedispersion_plan_yaml: str
+    grouper_yaml: str
+    def __init__(self, pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ..., dedispersion_plan_yaml: _Optional[str] = ..., grouper_yaml: _Optional[str] = ...) -> None: ...
 
 class ConfigReply(_message.Message):
     __slots__ = ("ok",)
@@ -35,16 +41,22 @@ class FrbEvent(_message.Message):
     def __init__(self, beam_id: _Optional[int] = ..., fpga_timestamp: _Optional[int] = ..., dm: _Optional[float] = ..., dm_error: _Optional[float] = ..., snr: _Optional[float] = ..., rfi_prob: _Optional[float] = ...) -> None: ...
 
 class FrbEventsMessage(_message.Message):
-    __slots__ = ("has_injections", "beam_set_id", "chunk_fpga_count", "events")
+    __slots__ = ("has_injections", "beam_set_id", "chunk_fpga_count", "events", "coarsegrain_start_fpga_count", "coarsegrain_end_fpga_count", "coarsegrain_snr")
     HAS_INJECTIONS_FIELD_NUMBER: _ClassVar[int]
     BEAM_SET_ID_FIELD_NUMBER: _ClassVar[int]
     CHUNK_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
     EVENTS_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_START_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_END_FPGA_COUNT_FIELD_NUMBER: _ClassVar[int]
+    COARSEGRAIN_SNR_FIELD_NUMBER: _ClassVar[int]
     has_injections: bool
     beam_set_id: int
     chunk_fpga_count: int
     events: _containers.RepeatedCompositeFieldContainer[FrbEvent]
-    def __init__(self, has_injections: bool = ..., beam_set_id: _Optional[int] = ..., chunk_fpga_count: _Optional[int] = ..., events: _Optional[_Iterable[_Union[FrbEvent, _Mapping]]] = ...) -> None: ...
+    coarsegrain_start_fpga_count: int
+    coarsegrain_end_fpga_count: int
+    coarsegrain_snr: _containers.RepeatedScalarFieldContainer[float]
+    def __init__(self, has_injections: bool = ..., beam_set_id: _Optional[int] = ..., chunk_fpga_count: _Optional[int] = ..., events: _Optional[_Iterable[_Union[FrbEvent, _Mapping]]] = ..., coarsegrain_start_fpga_count: _Optional[int] = ..., coarsegrain_end_fpga_count: _Optional[int] = ..., coarsegrain_snr: _Optional[_Iterable[float]] = ...) -> None: ...
 
 class FrbEventsReply(_message.Message):
     __slots__ = ("ok", "message")

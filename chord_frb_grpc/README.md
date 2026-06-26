@@ -3,6 +3,12 @@ system and the FRB Sifter.
 
 The assumption is that the FRB Search is running C++, and the FRB Sifter is running Python.
 
+.proto file format:
+https://protobuf.dev/programming-guides/proto3/
+
+Overview:
+https://protobuf.dev/overview/
+
 Unfortunately, it seems like the Ubuntu packages lag quite a bit behind the docs, at least the
 example code on grpc.io ... so for Ubuntu 24.04 I had to install:
 
