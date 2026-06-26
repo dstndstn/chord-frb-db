@@ -119,52 +119,47 @@ class KnownSourceSifter(Actor):
             source in the known sources database.
 
         """
-        try:
-            if np.in1d(event.l1_events["beam"],
-                       self.incoherent_beam_ids).all():
-                ks_region, _ = nearby_known_sources_window(self.ks_database,
-                    event.ra, event.dm, self.sky_region,
-                    event.dm_error * self.dm_region)
-            else:
-                ks_region, _ = nearby_known_sources_circle(
-                    self.ks_database,
-                    event.ra,
-                    event.dec,
-                    event.dm,
-                    self.sky_region,
-                    event.dm_error * self.dm_region,
-                )
+        if np.in1d(event.l1_events["beam"],
+                   self.incoherent_beam_ids).all():
+            ks_region, _ = nearby_known_sources_window(self.ks_database,
+                event.ra, event.dm, self.sky_region,
+                event.dm_error * self.dm_region)
+        else:
+            ks_region, _ = nearby_known_sources_circle(
+                self.ks_database,
+                event.ra,
+                event.dec,
+                event.dm,
+                self.sky_region,
+                event.dm_error * self.dm_region,
+            )
 
-            # only perform the comparison if there is something to compare with
-            if ks_region.size > 0:
-                probability = self.calculate_response(event, ks_region)
+        # only perform the comparison if there is something to compare with
+        if ks_region.size > 0:
+            probability = self.calculate_response(event, ks_region)
 
-                probability_max = np.nanmax(probability)
+            probability_max = np.nanmax(probability)
 
-                # does the most likely association meet the assoc. threshold?
-                if probability_max > self.threshold:
-                    best_match = ks_region[np.argmax(probability)]
+            # does the most likely association meet the assoc. threshold?
+            if probability_max > self.threshold:
+                best_match = ks_region[np.argmax(probability)]
 
-                    # find the ID of the known source in the KS database
-                    source_name = best_match["source_name"]
+                # find the ID of the known source in the KS database
+                source_name = best_match["source_name"]
 
-                    # remove the side-lobe copy identifier, if present
-                    if "_" in source_name:
-                        source_name = source_name.split("_")[0]
+                # remove the side-lobe copy identifier, if present
+                if "_" in source_name:
+                    source_name = source_name.split("_")[0]
 
-                    event['known_source_name'] = source_name
+                event['known_source_name'] = source_name
 
-                    event['known_source_rating'] = probability_max
+                event['known_source_rating'] = probability_max
 
-                    # i.e., do not override known source flag for RFI events
-                    if not event.is_rfi():
-                        event['is_known_source'] = True
+                # i.e., do not override known source flag for RFI events
+                if not event.is_rfi():
+                    event['is_known_source'] = True
 
-            return [event]
-
-        except Exception as e:
-            import traceback;traceback.print_exc()
-            return [event]
+        return [event]
 
     def load_filters(self):
         """Initializes the filters defined in the configuration file.
