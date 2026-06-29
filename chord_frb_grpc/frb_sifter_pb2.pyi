@@ -1,4 +1,5 @@
 from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from collections.abc import Iterable as _Iterable, Mapping as _Mapping
@@ -6,17 +7,24 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class ProtocolVersion(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+PROTOCOL_VERSION_UNSPECIFIED: _ClassVar[ProtocolVersion]
+PROTOCOL_VERSION_CURRENT: _ClassVar[ProtocolVersion]
+
 class ConfigMessage(_message.Message):
-    __slots__ = ("pirate_yaml", "xengine_yaml", "dedispersion_plan_yaml", "grouper_yaml")
+    __slots__ = ("protocol_version", "pirate_yaml", "xengine_yaml", "dedispersion_plan_yaml", "grouper_yaml")
+    PROTOCOL_VERSION_FIELD_NUMBER: _ClassVar[int]
     PIRATE_YAML_FIELD_NUMBER: _ClassVar[int]
     XENGINE_YAML_FIELD_NUMBER: _ClassVar[int]
     DEDISPERSION_PLAN_YAML_FIELD_NUMBER: _ClassVar[int]
     GROUPER_YAML_FIELD_NUMBER: _ClassVar[int]
+    protocol_version: int
     pirate_yaml: str
     xengine_yaml: str
     dedispersion_plan_yaml: str
     grouper_yaml: str
-    def __init__(self, pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ..., dedispersion_plan_yaml: _Optional[str] = ..., grouper_yaml: _Optional[str] = ...) -> None: ...
+    def __init__(self, protocol_version: _Optional[int] = ..., pirate_yaml: _Optional[str] = ..., xengine_yaml: _Optional[str] = ..., dedispersion_plan_yaml: _Optional[str] = ..., grouper_yaml: _Optional[str] = ...) -> None: ...
 
 class ConfigReply(_message.Message):
     __slots__ = ("ok",)

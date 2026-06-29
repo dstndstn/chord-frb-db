@@ -32,6 +32,7 @@ public:
 
   bool CheckConfiguration(const std::string& config_yaml, const std::string& xengine_yaml) {
         ConfigMessage msg;
+        msg.set_protocol_version(PROTOCOL_VERSION_CURRENT);
         msg.set_pirate_yaml(config_yaml);
         msg.set_xengine_yaml(xengine_yaml);
         ConfigReply reply;
