@@ -136,9 +136,15 @@ the beam density.
 
 ### KnownSourceSifter
 
+The logic itself should be fairly telescope agnostic, so main needs should just
+be checking for compatibility with CHORD pirate output and that correct DB values
+are set.
+
 Needs:
 - replace fixed dm_course_graining_factor=64 to work with CHORD fine grained DMs
 - remove sidelobe copy logic? Since not using in CHORD
+- review the known source labelling, does it collide with what other actors are 
+doing (DMChecker, BrightPulsarSifter), is it stored correctly in DB?
 
 Futures:
 - how will we handle sidelobes in CHIME/FRB upgrade?
@@ -149,7 +155,56 @@ Issues:
 
 ### DMChecker
 
+Shouldn't need much changes for CHORD from CHIME or CHORD -> CHIME/FRB Upgrade;
+the logic is fairly telescope agnostic.
+
+But, how should DM uncertainly and DM systematic errors be used? In CHIME L2/L3, its 
+just systematic error is difference between YMW and NE2001, and measured uncertainty
+is not used. This is probably fine for CHORD, but note Issue below.
+
+Needs:
+- review the frb/ambiguous/galactic labelling (in conjuction with other actors, e.g. KSS)
+- Check how DM_exgal is/should be stored in the DB, does actor set correctly?
+
+Issues:
+- The critieria being written in terms of measurement errors/systematics sigmas,
+but actually hacked to be based on the gap between YMW and NE2001 is a bit arcane.
+Change to be explicit on how its used? Use differently in CHORD?
+
+Futures:
+- Use NE2025?
+- Consider removing if we don't care about the Extragal, Gal distinction? 
+(will that ever be true?)
+- Reasoning for above: the frb_sifter pipeline should only have actors that are
+necessary for making decisions on what real-time actions to take per event. 
+If we want to save data for Galactic events, do we need the Gal/Exgal filter in 
+the realtime pipeline? The filter could be applied when e.g. making catalogs 
+(potentially informed by an analysis on the MW Disk/Halo using the FRB sample).
+- OTOH a fast gal/exgal filter is fairly important for collaboration members 
+wanting to know whether to be excited about an individual event of interest.
+
 ### ActionPicker 
+
+For this one we should spec out a minimal version for what is needed in the 
+Pathfinder. For that we need the following at minimum:
+
+For all events:
+- Save events to DB
+
+For some test event criteria (will change over time):
+- Save events to DB
+- Intensity callback
+
+For all FRBs and galactic unknown events:
+- Save events to DB
+- Intensity callback
+- Baseband callback
+- trigger CHIME and Outriggers
+
+Futures:
+- More complex action criteria, and a framework for how to keep the criteria 
+clean so its easily interpretable by human without any nested ifs etc.
+- More actions?
 
 ## Action picking and execution
 
