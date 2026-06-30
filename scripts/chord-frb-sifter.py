@@ -35,73 +35,55 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # beamset (int) -> arrays of (id, x, y)
         self.beamset_meta = {}
 
+        # beamset (int) to (Pirate callback address, Pirate gRPC stub)
+        self.beamset_pirate_rpc = {}
+
     def CheckConfiguration(self, request, context):
         print('CheckConfiguration: context', context)
         print('  peer:', context.peer())
-        conf = request.xengine_yaml
-        print('Received Xengine YAML config: "%s"' % conf)
+        xengine = request.xengine_yaml
+        print('Received Xengine YAML config: "%s"' % xengine)
+        pirate = request.pirate_yaml
+        print('Received Pirate YAML config: "%s"' % pirate)
+        dedisp = request.dedispersion_plan_yaml
+        print('Received Pirate dedisperser YAML config: "%s"' % dedisp)
+        grouper = request.grouper_yaml
+        print('Received Pirate Grouper YAML config: "%s"' % grouper)
         ok = True
-        if not self.check_xengine_config(conf):
-            print('YAML config mismatch (Xengine)!')
+        if not self.check_configs(xengine, pirate, dedisp, grouper):
+            print('Failed YAML config check')
             ok = False
-        conf = request.pirate_yaml
-        print('Received Pirate YAML config: "%s"' % conf)
-        if self.pirate_config is None:
-            self.pirate_config = conf
-        else:
-            if not self.check_pirate_config(conf):
-                print('YAML config mismatch (Pirate)!')
-                ok = False
-        conf = request.dedispersion_plan_yaml
-        print('Received Pirate dedisperser YAML config: "%s"' % conf)
-        if self.dedisp_config is None:
-            self.dedisp_config = conf
-        else:
-            if not self.check_dedisp_config(conf):
-                print('YAML config mismatch (Dedisp)!')
-                ok = False
-        conf = request.grouper_yaml
-        print('Received Pirate Grouper YAML config: "%s"' % conf)
-        if self.grouper_config is None:
-            self.grouper_config = conf
-        else:
-            if not self.check_grouper_config(conf):
-                print('YAML config mismatch (Grouper)!')
-                ok = False
         r = ConfigReply(ok=ok)
         return r
 
-    def check_xengine_config(self, conf):
-        if self.xengine_config_yaml is None:
-            self.xengine_config_yaml = conf
-            # Parse it...
-            self.xengine_config = yaml.load(self.xengine_config_yaml, Loader=Loader)
+    def check_configs(self, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml):
+        xengine = yaml.load(xengine_yaml, Loader=Loader)
+        beamset = xengine['beamset']
+        if beamset in self.beamset_meta:
+            print('Already received beamset %i' % beamset)
+            return False
+        self.beamset_meta[beamset] = (xengine['beam_ids'],
+                                      xengine['beam_positions_x'],
+                                      xengine['beam_positions_y'])
 
-            conf = self.xengine_config
-            beamset = conf['beamset']
-            if beamset in self.beamset_meta:
-                print('Already received beamset %i' % beamset)
-                return False
-            self.beamset_meta[beamset] = (conf['beam_ids'],
-                                          conf['beam_positions_x'],
-                                          conf['beam_positions_y'])
+        grouper = yaml.load(grouper_yaml, Loader=Loader)
+        # Check that we can call back to Pirate...
+        pirate_rpc = grouper['pirate_rpc_addr']
+        print('Pirate RPC address:', pirate_rpc)
 
-        else:
-            # Demand exact equality... what could go wrong
-            return conf == self.xengine_config_yaml
+        import grpc
+        from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
+        from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
+
+        # Open connection...
+        ch1 = grpc.insecure_channel(pirate_rpc)
+        pirate = FrbSearchStub(ch1)
+        # Make a pirate Status call
+        req = GetStatusRequest()
+        resp = pirate.GetStatus(req)
+        print('Got pirate RPC response:', resp)
+        self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
         return True
-
-    def check_pirate_config(self, conf):
-        # Demand exact equality... what could go wrong
-        return conf == self.pirate_config
-
-    def check_dedisp_config(self, conf):
-        # Demand exact equality... what could go wrong
-        return conf == self.dedisp_config
-    
-    def check_grouper_config(self, conf):
-        # Demand exact equality... what could go wrong
-        return conf == self.grouper_config
 
     def FrbEvents(self, request, context):
         print('FRB Events')
