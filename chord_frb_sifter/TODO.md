@@ -117,11 +117,13 @@ There are three versions in the current sifter repo:
 in a similar fashion to the baseband pipeline.
 
 For CHORD we should get the Localizer one working well.
+Localizer works in unit-sphere coordinates, which are the same as the Grid 
+coordinate implemented in chord_telescope.py. So should use those.
+This nicely removes dependance on cfbm.
 
 Needs:
-- a CHORD version of cfbm (or some module that handles the needed functionality)
-- settle on what coordinates we should use in the pipeline and localize using 
-those.
+- Change Localizer to use chord_telescope.py to transform between (x,y) telescope coordinates and ra, dec.
+- speed test those transforms, astropy can be slow. Do we need a faster transform implemented?
 - The fit cannot be performed successfully with one beam. So need to add a fallback
 option for that. e.g. a fiducial error given what we would expect if there is only
 a single beam detection given the S/N. This is simable. Though also depends on 
