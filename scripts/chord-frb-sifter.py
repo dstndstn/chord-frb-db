@@ -49,14 +49,15 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         print('Received Pirate dedisperser YAML config: "%s"' % dedisp)
         grouper = request.grouper_yaml
         print('Received Pirate Grouper YAML config: "%s"' % grouper)
+        pirate_rpc = request.search_ip_addr
         ok = True
-        if not self.check_configs(xengine, pirate, dedisp, grouper):
+        if not self.check_configs(xengine, pirate, dedisp, grouper, pirate_rpc):
             print('Failed YAML config check')
             ok = False
         r = ConfigReply(ok=ok)
         return r
 
-    def check_configs(self, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml):
+    def check_configs(self, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml, pirate_rpc):
         xengine = yaml.load(xengine_yaml, Loader=Loader)
         beamset = xengine['beamset']
         if beamset in self.beamset_meta:
@@ -66,9 +67,7 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                                       xengine['beam_positions_x'],
                                       xengine['beam_positions_y'])
 
-        grouper = yaml.load(grouper_yaml, Loader=Loader)
         # Check that we can call back to Pirate...
-        pirate_rpc = grouper['pirate_rpc_addr']
         print('Pirate RPC address:', pirate_rpc)
 
         import grpc
@@ -87,27 +86,24 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
     def FrbEvents(self, request, context):
         print('FRB Events')
-        if request.has_injections != self.injections:
-            print('Received FRB Events %s injections, but this FRB Sifter is%s handling injections!' % ('with' if request.has_injections else 'without', '' if self.injections else ' not'))
-            return FrbEventsReply(ok=False, message='Expected has_injections=%s, got %s - are you sending to the wrong FRB Sifter (injection vs prod)?' % (self.injections, request.has_injections))
+        # if request.has_injections != self.injections:
+        #     print('Received FRB Events %s injections, but this FRB Sifter is%s handling injections!' % ('with' if request.has_injections else 'without', '' if self.injections else ' not'))
+        #     return FrbEventsReply(ok=False, message='Expected has_injections=%s, got %s - are you sending to the wrong FRB Sifter (injection vs prod)?' % (self.injections, request.has_injections))
         msg = ''
         ok = True
 
-        print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_count, 'with', len(request.events), 'events')
+        print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_start, 'to', request.chunk_fpga_end, 'with', len(request.events), 'events')
         for e in request.events:
             print('  event', e)
         if len(request.events):
             self.event_queue.put(request.events)
 
-        print('Coarse-grained array FPGA-count start & stop',
-              request.coarsegrain_start_fpga_count,
-              request.coarsegrain_end_fpga_count)
         print('Coarse-grained array length:', len(request.coarsegrain_snr))
         print('Peer:', context.peer())
         if len(request.coarsegrain_snr):
             self.beam_snr_queue.put(dict(beamset=request.beam_set_id,
-                                         fpga_start=request.coarsegrain_start_fpga_count,
-                                         fpga_end=request.coarsegrain_end_fpga_count,
+                                         fpga_start=request.chunk_fpga_start,
+                                         fpga_end=request.chunk_fpga_end,
                                          beam_snr=request.coarsegrain_snr,
                                          peer=context.peer()))
 
