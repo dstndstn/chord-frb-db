@@ -196,21 +196,25 @@ class L2Event(dict):
         return getattr(self, 'flag_rfi', False)
     def is_frb(self):
         return getattr(self, 'flag_frb', False)
-    def is_galactic(self):
-        return getattr(self, 'flag_galactic', False)
-    def is_ambiguous(self):
-        return getattr(self, 'flag_ambiguous', False)
+    def is_known_pulsar(self):
+        return getattr(self, 'flag_known_pulsar', False)
+    def is_repeating_frb(self):
+        return getattr(self, 'flag_repeating_frb', False)
+    def is_new_burst(self):
+        return getattr(self, 'flag_new_burst', False)
     def is_known_source(self):
-        return getattr(self, 'flag_known_source', False)
+        return self.is_known_pulsar() or self.is_repeating_frb()
 
     def set_rfi(self):
         self.flag_rfi = True
     def set_frb(self):
         self.flag_frb = True
-    def set_ambiguous(self):
-        self.flag_ambiguous = True
-    def set_galactic(self):
-        self.flag_galactic = True
+    def set_known_pulsar(self):
+        self.flag_known_pulsar = True
+    def set_repeating_frb(self):
+        self.flag_repeating_frb = True
+    def set_new_burst(self):
+        self.flag_new_burst = True
 
     def __getattr__(self, name):
         if name in self._reserved:
@@ -229,10 +233,10 @@ class L2Event(dict):
         # dict shallow copy
         #payload = self.copy()
         l2_db_args = { 'is_rfi': self.is_rfi(),
-                       'is_known_pulsar': False,
-                       'is_new_burst': False,
+                       'is_known_pulsar': self.is_known_pulsar(),
+                       'is_new_burst': self.is_new_burst(),
                        'is_frb': self.is_frb(),
-                       'is_repeating_frb': False,
+                       'is_repeating_frb': self.is_repeating_frb(),
                        'scattering': 0.,
                        'fluence': 0.,
         }

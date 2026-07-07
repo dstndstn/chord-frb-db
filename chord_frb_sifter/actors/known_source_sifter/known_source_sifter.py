@@ -15,6 +15,7 @@ from . import known_source_filters
 _KS_DTYPE = np.dtype([
     ('id',          np.int64),
     ('source_name', 'U64'),
+    ('source_type', 'U32'),
     ('pos_ra_deg',  np.float32),
     ('pos_dec_deg', np.float32),
     ('dm',          np.float32),
@@ -30,7 +31,7 @@ def _load_known_sources(database_engine):
     rows = []
     with Session(database_engine) as session:
         for (ks,) in session.execute(select(KnownSource)):
-            rows.append((ks.id, ks.name, ks.ra, ks.dec, ks.dm))
+            rows.append((ks.id, ks.name, ks.source_type, ks.ra, ks.dec, ks.dm))
 
     if not rows:
         return np.zeros(0, dtype=_KS_DTYPE)
@@ -135,6 +136,7 @@ class KnownSourceSifter(Actor):
             )
 
         # only perform the comparison if there is something to compare with
+        matched = False
         if ks_region.size > 0:
             probability = self.calculate_response(event, ks_region)
 
@@ -152,12 +154,18 @@ class KnownSourceSifter(Actor):
                     source_name = source_name.split("_")[0]
 
                 event['known_source_name'] = source_name
-
                 event['known_source_rating'] = probability_max
 
-                # i.e., do not override known source flag for RFI events
                 if not event.is_rfi():
-                    event['is_known_source'] = True
+                    source_type = best_match["source_type"]
+                    if source_type == "Pulsar":
+                        event.set_known_pulsar()
+                    elif source_type == "FRB":
+                        event.set_repeating_frb()
+                    matched = True
+
+        if not matched and not event.is_rfi() and not event.is_known_source():
+            event.set_new_burst()
 
         return [event]
 

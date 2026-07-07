@@ -56,7 +56,7 @@ class BrightPulsarSifter(Actor):
                     event['bright_pulsar_name'] = pulsar
                     event['known_source_name'] = pulsar
                     if not event.is_rfi():
-                        event['is_known_source'] = True
+                        event.set_known_pulsar()
                     return [event]
 
         event['is_bright_pulsar'] = False

@@ -47,7 +47,7 @@ class ActionPicker(Actor):
         # Log everything in db?
         self.save_to_db(event)
 
-        if event.is_frb() or event.is_ambiguous():
+        if event.is_frb() or event.is_new_burst():
             print('FRB or Ambiguous event -- sending intensity callback!')
             self.send_intensity_callback(event)
         # if event.is_rfi():

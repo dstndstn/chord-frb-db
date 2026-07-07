@@ -113,9 +113,8 @@ specifics:
 
     DMChecker:
         systematic_uncertainty_limit: 0.    # lower limit in DM systematic uncertainty.
-        ambiguous_threshold: -1.0           # float; significance threshold for ambiguous class.
         frb_threshold: 0.                   # float; significance threshold for FRB class.
-        use_measured_uncertainty : False    # bool; do we want to use measured uncertainty 
+        use_measured_uncertainty : False    # bool; do we want to use measured uncertainty
                                             #       when determining source classification?
         io: ['+ipc://KnownSourceSifter_b', '+ipc://DMChecker_a']
 

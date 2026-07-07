@@ -14,30 +14,24 @@ class DMChecker(Actor):
     """
     A subclass of ``ActorBaseClass`` for computing maximum Galactic DMs given
     an L2-estimated line of site, and using the predicted and L2-estimated DMs to
-    determine if an unknown astrophysical source is extragalactic (i.e. an FRB) or not
-    (i.e. ambiguous or Galactic).
+    determine if an unknown astrophysical source is extragalactic (i.e. an FRB) or not.
 
     Parameters
     ----------
 
     systematic_uncertainty_limit : float
-        A fraction of predicted-DM values to use as a lower limit on the systematic 
-        uncertainty in calculations for source classification. This is useful for 
-        in/near-Plane candidates where the difference in the NE2001 and YMW16 is 
+        A fraction of predicted-DM values to use as a lower limit on the systematic
+        uncertainty in calculations for source classification. This is useful for
+        in/near-Plane candidates where the difference in the NE2001 and YMW16 is
         considerably small, though systematic uncertainty in either model is high.
-
-    ambiguous_threshold : float
-        The number of standard deviations used as a threshold for determining
-        if the astrophysical signal is an ambiguous source, i.e. if its DM is marginally
-        larger than the predicted Galactic component. Default is 2.
 
     frb_threshold : float
         The number of standard deviations used as a threshold for determining
         if the astrophysical signal is extragalactic, i.e. if its an FRB. Default is 5.
 
     use_measured_uncertainty : bool
-        If True, add measured and systematic uncertainties in quadrature to obtain 
-        a "full" measure of uncertainty for use in classification. If False, only 
+        If True, add measured and systematic uncertainties in quadrature to obtain
+        a "full" measure of uncertainty for use in classification. If False, only
         use systematic uncertainty in calculations.
 
     Notes
@@ -51,7 +45,6 @@ class DMChecker(Actor):
     def __init__(
         self,
         systematic_uncertainty_limit,
-        ambiguous_threshold,
         frb_threshold,
         use_measured_uncertainty,
         **kwargs
@@ -61,7 +54,6 @@ class DMChecker(Actor):
 
         # store configuration parameters.
         self.systematic_uncertainty_limit = systematic_uncertainty_limit
-        self.ambiguous_threshold = ambiguous_threshold
         self.frb_threshold = frb_threshold
         self.use_measured_uncertainty = use_measured_uncertainty
 
@@ -106,16 +98,8 @@ class DMChecker(Actor):
         # finally, compare with threshold and return boolean.
         dm_diff = (dm_measured - dm_pred) / np.hypot(dm_uncertainty, dm_systematic_error)
         
-        # classify into galactic / ambiguous / extragalactic = FRB
         if all(dm_diff > self.frb_threshold):
             event.set_frb()
-
-        elif (any(dm_diff <  self.frb_threshold) and
-              all(dm_diff >= self.ambiguous_threshold)):
-            event.set_ambiguous()
-
-        else:
-            event.set_galactic()
 
         # update 'max_dm' attribute in accordance with configured DM model.
         event.dm_gal_ymw_2016_max = dm_ymw16
