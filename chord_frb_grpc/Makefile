@@ -22,7 +22,7 @@ $(SEARCH): frb_search.proto
 	(cd .. && python -m grpc_tools.protoc -Ichord_frb_grpc=chord_frb_grpc --python_out=. --pyi_out=. --grpc_python_out=. chord_frb_grpc/$<)
 
 %_pb2.py %_pb2.pyi %_pb2_grpc.py: %.proto
-	python -m grpc_tools.protoc -I. --python_out=. --pyi_out=. --grpc_python_out=. $<
+	python3 -m grpc_tools.protoc -I=. --python_out=. --pyi_out=. --grpc_python_out=. $<
 
 CPPTEST := cpptest
 all: $(CPPTEST)

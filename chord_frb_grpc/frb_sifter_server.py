@@ -1,5 +1,5 @@
 from chord_frb_grpc import frb_sifter_pb2_grpc
-from chord_frb_grpc.frb_sifter_pb2 import ConfigReply, FrbEventsReply
+from chord_frb_grpc.frb_sifter_pb2 import ConfigReply, FrbEventsReply, PROTOCOL_VERSION_CURRENT
 import queue
 
 
@@ -14,6 +14,16 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
     def CheckConfiguration(self, request, context):
         print('CheckConfiguration: context', context)
         print('  peer:', context.peer())
+
+        # Reject any client whose wire-protocol version doesn't match ours (see
+        # the ProtocolVersion enum in frb_sifter.proto). This also rejects an old
+        # client that never set the field, since protocol_version then defaults to
+        # 0 == PROTOCOL_VERSION_UNSPECIFIED.
+        if request.protocol_version != PROTOCOL_VERSION_CURRENT:
+            print('Protocol version mismatch: client sent %d, sifter expects %d'
+                  % (request.protocol_version, PROTOCOL_VERSION_CURRENT))
+            return ConfigReply(ok=False)
+
         conf = request.xengine_yaml
         print('Received Xengine YAML config: "%s"' % conf)
         ok = True
