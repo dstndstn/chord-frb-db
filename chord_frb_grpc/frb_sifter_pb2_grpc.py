@@ -5,7 +5,7 @@ import warnings
 
 import frb_sifter_pb2 as frb__sifter__pb2
 
-GRPC_GENERATED_VERSION = '1.80.0'
+GRPC_GENERATED_VERSION = '1.81.1'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -25,7 +25,7 @@ if _version_not_supported:
     )
 
 
-class FrbSifterStub(object):
+class FrbSifterStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -46,7 +46,7 @@ class FrbSifterStub(object):
                 _registered_method=True)
 
 
-class FrbSifterServicer(object):
+class FrbSifterServicer:
     """Missing associated documentation comment in .proto file."""
 
     def CheckConfiguration(self, request, context):
@@ -58,10 +58,7 @@ class FrbSifterServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def FrbEvents(self, request, context):
-        """?? For injections only
-        rpc NewBeamSet (BeamSetUpdateMessage) returns (BeamSetUpdateReply) {}
-
-        Report events from a given time chunk.
+        """Report events from a given time chunk.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -88,7 +85,7 @@ def add_FrbSifterServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class FrbSifter(object):
+class FrbSifter:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod

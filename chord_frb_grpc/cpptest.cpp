@@ -53,15 +53,14 @@ public:
                           int32_t beamset_id, int64_t chunk_fpga_count) {
         FrbEventsMessage msg;
         FrbEventsReply reply;
-        msg.set_has_injections(injections);
+        msg.set_from_simulator(injections);
         msg.set_beam_set_id(beamset_id);
-        msg.set_chunk_fpga_count(chunk_fpga_count);
+        msg.set_chunk_fpga_start(chunk_fpga_count);
         for (auto e : events) {
             FrbEvent* ee = msg.add_events();
             ee->set_beam_id(e.beam_id);
             ee->set_fpga_timestamp(e.fpga_timestamp);
             ee->set_dm(e.dm);
-            ee->set_dm_error(e.dm_error);
             ee->set_snr(e.snr);
             ee->set_rfi_prob(e.rfi_prob);
         }
