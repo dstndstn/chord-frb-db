@@ -156,7 +156,7 @@ class PirateConfig(Base):
     # xengine_config
     xengine_config: Mapped[str]  # = mapped_column(String(10240))
     # pirate_config
-    pirate_config: Mapped[str]  # = mapped_column(String(10240))
+    pirate_config: Mapped[str] = mapped_column(nullable=True) # = mapped_column(String(10240))
     # beam_x
     beam_x: Mapped[List[float]] = mapped_column(ARRAY(REAL, dimensions=1, zero_indexes=True))
     # beam_y
