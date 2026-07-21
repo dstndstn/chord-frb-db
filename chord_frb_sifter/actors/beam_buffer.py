@@ -45,7 +45,7 @@ class BeamBuffer(Actor):
         current_events = None
         for e in events:
             chunk = e['chunk_utc']
-            beam = e['beam']
+            beam = e['beam_id']
             if current_chunk is None:
                 current_chunk = chunk
                 current_beam = beam

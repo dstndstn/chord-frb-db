@@ -28,9 +28,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         self.injections = injections
         self.xengine_config_yaml = None
         self.xengine_config = None
-        self.pirate_config = None
-        self.dedisp_config = None
-        self.grouper_config = None
+        self.pirate_config_yaml = None
+        #self.dedisp_config = None
+        #self.grouper_config = None
 
         # beamset (int) -> arrays of (id, x, y)
         self.beamset_meta = {}
@@ -38,18 +38,32 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # beamset (int) to (Pirate callback address, Pirate gRPC stub)
         self.beamset_pirate_rpc = {}
 
+    def print_yaml(self, y):
+        # just indent...
+        lines = y.split('\n')
+        for line in lines:
+            if len(line) > 100:
+                line = line[:96] + ' ...'
+            print('    ' + line)
+
     def CheckConfiguration(self, request, context):
         print('CheckConfiguration: context', context)
         print('  peer:', context.peer())
         xengine = request.xengine_yaml
-        print('Received Xengine YAML config: "%s"' % xengine)
+        print('Received Xengine YAML config: len %i' % len(xengine))
+        self.print_yaml(xengine)
         pirate = request.pirate_yaml
-        print('Received Pirate YAML config: "%s"' % pirate)
+        print('Received Pirate YAML config: len %i' % len(pirate))
+        self.print_yaml(pirate)
         dedisp = request.dedispersion_plan_yaml
-        print('Received Pirate dedisperser YAML config: "%s"' % dedisp)
+        print('Received Pirate dedisperser YAML config: len %i' % len(dedisp))
+        self.print_yaml(dedisp)
         grouper = request.grouper_yaml
-        print('Received Pirate Grouper YAML config: "%s"' % grouper)
+        print('Received Pirate Grouper YAML config: len %i' % len(grouper))
+        self.print_yaml(grouper)
         pirate_rpc = request.search_ip_addr
+        print('Received Pirate RPC address: "%s"' % pirate_rpc)
+
         ok = True
         if not self.check_configs(xengine, pirate, dedisp, grouper, pirate_rpc):
             print('Failed YAML config check')
@@ -60,28 +74,49 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
     def check_configs(self, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml, pirate_rpc):
         xengine = yaml.load(xengine_yaml, Loader=Loader)
         beamset = xengine['beamset']
+        new_meta = (xengine['beam_ids'],
+                    xengine['beam_positions_x'],
+                    xengine['beam_positions_y'])
         if beamset in self.beamset_meta:
-            print('Already received beamset %i' % beamset)
-            return False
-        self.beamset_meta[beamset] = (xengine['beam_ids'],
-                                      xengine['beam_positions_x'],
-                                      xengine['beam_positions_y'])
+            print('Already received beamset %i - checking consistency' % beamset)
+            if new_meta != self.beamset_meta[beamset]:
+                print('Metadata for beamset %i not equal:\n%s\nvs\n%s' %
+                      (beamset, new_meta, self.beamset_meta[beamset]))
+                return False
+        else:
+            self.beamset_meta[beamset] = new_meta
 
-        # Check that we can call back to Pirate...
-        print('Pirate RPC address:', pirate_rpc)
+        # Fake x-engine sending us injected events?  Don't validate.
+        is_fake = ((len(xengine_yaml) > 0) and
+                   (len(pirate_yaml) == 0) and
+                   (len(dedisp_yaml) == 0) and
+                   (len(grouper_yaml) == 0) and
+                   (len(pirate_rpc) == 0))
+        if is_fake:
+            print('Only x-engine yaml is non-empty -- assuming fake x-engine message')
 
-        import grpc
-        from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
-        from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
+        if not is_fake:
+            import grpc
+            from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
+            from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
+            # Check that we can call back to Pirate...
+            print('Pirate RPC address:', pirate_rpc)
+            # Open connection...
+            ch1 = grpc.insecure_channel(pirate_rpc)
+            pirate = FrbSearchStub(ch1)
+            # Make a pirate Status call
+            req = GetStatusRequest()
+            resp = pirate.GetStatus(req)
+            print('Got pirate RPC response:', resp)
+            self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
 
-        # Open connection...
-        ch1 = grpc.insecure_channel(pirate_rpc)
-        pirate = FrbSearchStub(ch1)
-        # Make a pirate Status call
-        req = GetStatusRequest()
-        resp = pirate.GetStatus(req)
-        print('Got pirate RPC response:', resp)
-        self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
+        # save parsed and yaml xengine config
+        self.xengine_config = xengine
+        self.xengine_config_yaml = xengine_yaml
+        if not is_fake:
+            self.pirate_config_yaml = pirate_yaml
+            # dedisp? grouper?
+
         return True
 
     def FrbEvents(self, request, context):
@@ -94,9 +129,13 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_start, 'to', request.chunk_fpga_end, 'with', len(request.events), 'events')
         for e in request.events:
-            print('  event', e)
+            print('  event', type(e), e)
         if len(request.events):
-            self.event_queue.put(request.events)
+            header = dict()
+            keys = ['chunk_fpga_start']
+            for key in keys:
+                header[key] = getattr(request, key)
+            self.event_queue.put((request.events, header))
 
         print('Coarse-grained array length:', len(request.coarsegrain_snr))
         print('Peer:', context.peer())
@@ -124,10 +163,31 @@ def serve(sifter, port=10000, max_threads=10):
     return server
 
 def event_handler(sifter, event_queue, pipeline):
+    # fpga to utc conversions
+    t0 = None
+    dt = None
     while True:
-        events = event_queue.get()
+        events,header = event_queue.get()
         print('event_handler: got', len(events), 'events')
-        simple_process_events(pipeline, events)
+        # Convert grpc FrbEvent objects into simple dicts.
+        event_list = []
+        for e in events:
+            # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
+            simple_event = dict()
+            for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
+                        'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
+                simple_event[key] = getattr(e, key)
+            # values from the chunk-header
+            for key in ['chunk_fpga_start']:
+                simple_event[key] = header[key]
+            # convert FPGA to UTC seconds...
+            if t0 is None:
+                t0 = sifter.xengine_config['unix_ns_at_seq_0']
+                dt = sifter.xengine_config['dt_ns_per_seq']
+            simple_event['chunk_utc'] = (t0 + dt * header['chunk_fpga_start']) * 1e-9
+            event_list.append(simple_event)
+        #simple_process_events(pipeline, events)
+        simple_process_events(pipeline, event_list)
 
 def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()
@@ -148,28 +208,34 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
                 # peer?, unix_nano0, date of first message?
                 print('Looking up beamset', beamset, 'in xengine YAML...')
                 print(sifter.xengine_config)
-    
+
                 if not beamset in sifter.beamset_meta:
                     print('Unknown beamset', beamset)
                     continue
-    
+
                 # arrays
                 beam_id, beam_x, beam_y = sifter.beamset_meta[beamset]
-    
+
                 # Add beamset, beam_ids, beam_x, beam_y to the db!
                 pc = PirateConfig(beamset=beamset,
                                   start_time=datetime.now(),   # ???
                                   xengine_config=sifter.xengine_config_yaml,
-                                  pirate_config=sifter.pirate_config,
+                                  pirate_config=sifter.pirate_config_yaml,
                                   beam_x=beam_x,
                                   beam_y=beam_y,
                                   beam_id=beam_id)
-                session.add(pc)
-                session.flush()
-                print('Saved PirateConfig to database: id', pc.id)
-                session.commit()
-                pirate_configs[beamset] = pc.id
-
+                try:
+                    #print('Saving Pirate Config to database:', pc)
+                    session.add(pc)
+                    session.flush()
+                    print('Saved PirateConfig to database: id', pc.id)
+                    session.commit()
+                    pirate_configs[beamset] = pc.id
+                except Exception as e:
+                    import traceback
+                    print('Failed to insert PirateConfig to database;', e)
+                    traceback.print_exc()
+                    raise
                 known_beamsets.add(beamset)
     
                 # timing ... this only needs to get initialized once!
@@ -192,10 +258,16 @@ def beam_snr_handler(sifter, beam_snr_queue, database):
             bs = BeamSNR(pirate_config_id=pirate_configs[beamset],
                          timestamp=date_start,
                          beam_snr=snr_array)
-            session.add(bs)
-            session.flush()
-            print('Saved BeamSNR to database: id', bs.id)
-            session.commit()
+            try:
+                #print('Saving BeamSNR to db:', bs)
+                session.add(bs)
+                session.flush()
+                print('Saved BeamSNR to database: id', bs.id)
+                session.commit()
+            except Exception as e:
+                import traceback
+                print('Error saving BeamSNR to database:', e)
+                raise
 
 '''
 Example xengine metadata:
