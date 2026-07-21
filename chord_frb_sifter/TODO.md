@@ -24,7 +24,7 @@ parameters needed by the pipeline.
 
 Needs:
 - injest the upstream config parameter to the module.
-- 
+- Make a CHORD sifter pipeline config yaml to replace drao_epsilon_pipeline_local.yaml.
 
 ### gRPC interface with FRB search
 
