@@ -55,7 +55,7 @@ class Event(Base):
     dec:       Mapped[Optional[float]] = mapped_column(REAL)
     dec_error: Mapped[Optional[float]] = mapped_column(REAL)
 
-    dm_ne2001:  Mapped[Optional[float]] = mapped_column(REAL)
+    dm_ne2025:  Mapped[Optional[float]] = mapped_column(REAL)
     dm_ymw2016: Mapped[Optional[float]] = mapped_column(REAL)
     
     spectral_index: Mapped[Optional[float]] = mapped_column(REAL)

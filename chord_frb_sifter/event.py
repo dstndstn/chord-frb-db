@@ -253,7 +253,7 @@ class L2Event(dict):
             'pos_error_semimajor_deg_68': 'ra_error',
             'pos_dec_deg': 'dec',
             'pos_error_semiminor_deg_68': 'dec_error',
-            'dm_gal_ne_2001_max': 'dm_ne2001',
+            'dm_gal_ne_2025_max': 'dm_ne2025',
             'dm_gal_ymw_2016_max': 'dm_ymw2016',
             'spectral_index': True,
             'pulse_width_ms': 'pulse_width',
