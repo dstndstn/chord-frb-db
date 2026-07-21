@@ -120,25 +120,36 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         return True
 
     def FrbEvents(self, request, context):
-        print('FRB Events')
         # if request.has_injections != self.injections:
         #     print('Received FRB Events %s injections, but this FRB Sifter is%s handling injections!' % ('with' if request.has_injections else 'without', '' if self.injections else ' not'))
         #     return FrbEventsReply(ok=False, message='Expected has_injections=%s, got %s - are you sending to the wrong FRB Sifter (injection vs prod)?' % (self.injections, request.has_injections))
         msg = ''
         ok = True
 
-        print('beam-set', request.beam_set_id, 'chunk FPGA', request.chunk_fpga_start, 'to', request.chunk_fpga_end, 'with', len(request.events), 'events')
-        for e in request.events:
-            print('  event', type(e), e)
+        print(('Got FRB Events grpc: beam-set %i, chunk FPGA %i to %i, %i events, ' +
+               'coarse-grain SNR array: length %i') %
+              (request.beam_set_id, request.chunk_fpga_start, request.chunk_fpga_end,
+               len(request.events), len(request.coarsegrain_snr)))
+        #for e in request.events:
+        #    print('  event', type(e), e)
         if len(request.events):
             header = dict()
             keys = ['chunk_fpga_start']
             for key in keys:
                 header[key] = getattr(request, key)
-            self.event_queue.put((request.events, header))
 
-        print('Coarse-grained array length:', len(request.coarsegrain_snr))
-        print('Peer:', context.peer())
+            # Convert grpc FrbEvent objects into simple dicts.
+            event_list = []
+            for e in request.events:
+                # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
+                simple_event = dict()
+                for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
+                            'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
+                    simple_event[key] = getattr(e, key)
+                event_list.append(simple_event)
+            self.event_queue.put((event_list, header))
+
+        #print('Peer:', context.peer())
         if len(request.coarsegrain_snr):
             self.beam_snr_queue.put(dict(beamset=request.beam_set_id,
                                          fpga_start=request.chunk_fpga_start,
@@ -170,24 +181,17 @@ def event_handler(sifter, event_queue, pipeline):
         events,header = event_queue.get()
         print('event_handler: got', len(events), 'events')
         # Convert grpc FrbEvent objects into simple dicts.
-        event_list = []
         for e in events:
-            # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
-            simple_event = dict()
-            for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
-                        'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
-                simple_event[key] = getattr(e, key)
-            # values from the chunk-header
+            # Add values from the chunk-header
             for key in ['chunk_fpga_start']:
-                simple_event[key] = header[key]
+                e[key] = header[key]
             # convert FPGA to UTC seconds...
             if t0 is None:
                 t0 = sifter.xengine_config['unix_ns_at_seq_0']
                 dt = sifter.xengine_config['dt_ns_per_seq']
-            simple_event['chunk_utc'] = (t0 + dt * header['chunk_fpga_start']) * 1e-9
-            event_list.append(simple_event)
-        #simple_process_events(pipeline, events)
-        simple_process_events(pipeline, event_list)
+            e['chunk_utc'] = (t0 + dt * header['chunk_fpga_start']) * 1e-9
+            e['timestamp_utc'] = (t0 + dt * e['fpg_timestamp']) * 1e-9
+        simple_process_events(pipeline, events)
 
 def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()
