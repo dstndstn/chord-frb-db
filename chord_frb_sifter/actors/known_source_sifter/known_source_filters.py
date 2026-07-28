@@ -105,7 +105,7 @@ def compare_position(event, known_sources, weight, **kwargs):
     # default to 0, 1000, 2000 and 3000 if not specified
     incoherent_beam_ids = kwargs.get("incoherent_beam_ids", [0, 1000, 2000, 3000])
 
-    if np.in1d(event.l1_events["beam"], incoherent_beam_ids).all():
+    if np.in1d(event.l1_events["beam_id"], incoherent_beam_ids).all():
         mu_min = 0
         mu_max = 360
 

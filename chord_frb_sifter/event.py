@@ -41,7 +41,7 @@ def get_L1Event_dtype():
     # These are fields that Dustin has in the list of dicts l1 events
     l1_dtype = np.dtype([
         ("id", np.uint64),
-        ("beam", np.uint16),
+        ("beam_id", np.uint16),
         ("timestamp_utc", np.float64),
         ("timestamp_fpga", np.uint64),
         ("frame0_nano", np.uint64),
@@ -78,7 +78,7 @@ def simulate_l2_event():
     fake_l1['snr'] = [10.0, 8.0, 6.0]
     fake_l1['dm'] = 100.0
     fake_l1['tree_index'] = 2
-    fake_l1['beam'] = [0, 1, 2]
+    fake_l1['beam_id'] = [0, 1, 2]
     # snr_vs_dm needs nonzero values so RFI feature extraction doesn't get an empty array
     fake_l1['snr_vs_dm'] = np.array([5.0, 6.0, 7.0, 8.0, 9.0, 9.5, 10.0, 9.5, 9.0,
                                       8.0, 7.0, 6.0, 5.0, 4.5, 4.0, 3.5, 3.0])
@@ -137,8 +137,8 @@ class L1Event(np.recarray):
     def database_payloads(self):
         l1_name_map = {
             'id': True,
-            'beam': True,
-            'beam_no': 'beam',
+            'beam_id': True,
+            'beam_no': 'beam_id',
             'snr': True,
             'timestamp_fpga': True,
             'timestamp_utc': True,

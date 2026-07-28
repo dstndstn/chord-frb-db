@@ -120,7 +120,7 @@ class KnownSourceSifter(Actor):
             source in the known sources database.
 
         """
-        if np.in1d(event.l1_events["beam"],
+        if np.in1d(event.l1_events["beam_id"],
                    self.incoherent_beam_ids).all():
             ks_region, _ = nearby_known_sources_window(self.ks_database,
                 event.ra, event.dm, self.sky_region,

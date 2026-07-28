@@ -82,7 +82,7 @@ class EventBeam(Base):
     #id:   Mapped[int] = mapped_column(BigInteger, primary_key=True)
     id:   Mapped[int] = mapped_column(primary_key=True)
 
-    beam: Mapped[int]
+    beam_id: Mapped[int]
 
     snr:  Mapped[float] = mapped_column(REAL)
 
@@ -221,7 +221,7 @@ if __name__ == '__main__':
         session.flush()
         print('d id', d.id)
     
-        e = EventBeam(dm=42, beam=900, snr=20, timestamp_utc=1400000, timestamp_fpga=10000,
+        e = EventBeam(dm=42, beam_id=900, snr=20, timestamp_utc=1400000, timestamp_fpga=10000,
                       time_error=0., tree_index=0, rfi_grade=0, rfi_mask_fraction=0.,
                       rfi_clip_fraction=0., dm_error=0.1, ra=0., dec=0., ra_error=0., dec_error=0.)
         session.add(e)

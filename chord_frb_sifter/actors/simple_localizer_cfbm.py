@@ -31,7 +31,7 @@ class SimpleLocalizerCFBM(Actor):
 
     def _perform_action(self, event):
         l1_events = event['l1_events']
-        beams = np.array([e['beam'] for e in l1_events])
+        beams = np.array([e['beam_id'] for e in l1_events])
         snrs  = np.array([e['snr']  for e in l1_events], dtype=float)
 
         # Shape: (N_beams, 1, 2) -> take first (only) freq -> (N_beams, 2)
