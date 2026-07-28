@@ -9,8 +9,13 @@ import numpy as np
 from flask_sqlalchemy import SQLAlchemy
 
 from chord_frb_db.models import Event, EventBeam
+from chord_frb_db.models import PirateConfig, BeamSNR
 
 import sqlalchemy as sa
+#from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from datetime import timedelta
 
 #from flask import session
 #print('Config:', Config)
@@ -22,6 +27,64 @@ db = SQLAlchemy(app)
 @app.route('/d3')
 def d3():
     return render_template('d3.html')
+
+@app.route('/d3b')
+def d3b():
+    return render_template('d3b.html')
+
+@app.route('/beam-max-snr/latest')
+def beam_max_snr():
+    latest = db.session.scalar(sa.select(sa.func.max(BeamSNR.timestamp)))
+    print('result:', latest)
+    #print(type(latest))
+    #
+    # result = db.session.execute(sa.select(BeamSNR, PirateConfig).where(
+    #     BeamSNR.timestamp == latest, BeamSNR.pirate_config_id == PirateConfig.id)).first()
+    # beamsnr, pirate = result
+
+    after = latest - timedelta(seconds=10)
+
+    latest = db.session.execute(sa.select(sa.func.max(BeamSNR.timestamp), BeamSNR.pirate_config_id)
+                                .where(BeamSNR.timestamp > after)
+                                .group_by(BeamSNR.pirate_config_id))
+    print('result:', latest)
+
+    beamsets = []
+    timestamps = []
+    timestamps_nano = []
+    beam_ids = []
+    beam_xs = []
+    beam_ys = []
+    beam_snrs = []
+    
+    for r in latest:
+        #print(r)
+        timestamp, pirate_config_id = r
+
+        result = db.session.execute(sa.select(BeamSNR, PirateConfig).where(
+            BeamSNR.timestamp == timestamp,
+            BeamSNR.pirate_config_id==pirate_config_id,
+            BeamSNR.pirate_config_id == PirateConfig.id))
+        print('result:', result)
+        for r2 in result:
+            beamsnr, pirate = r2
+
+        beamsets.append(pirate.beamset)
+        timestamps.append(beamsnr.timestamp)
+        timestamps_nano.append(str(int(beamsnr.timestamp.timestamp() * 1e9)))
+        beam_ids.append(pirate.beam_id)
+        beam_xs.append(pirate.beam_x)
+        beam_ys.append(pirate.beam_y)
+        beam_snrs.append(beamsnr.beam_snr)
+
+    # Return JSON:
+    return dict(beamsets=beamsets,
+                timestamps=timestamps,
+                timestamps_nano=timestamps_nano,
+                beam_ids=beam_ids,
+                beam_xs=beam_xs,
+                beam_ys=beam_ys,
+                beam_snrs=beam_snrs)
 
 @app.route('/mwe')
 def mwe():
@@ -250,5 +313,8 @@ def event_plot():
     resp.headers['Content-type'] = 'image/png'
     return resp
 
-#if __name__ == '__main__':
-    
+if __name__ == '__main__':
+    from flask import request
+    with app.test_request_context('/beam-max-snr/latest', method='GET'):
+        beam_max_snr()
+

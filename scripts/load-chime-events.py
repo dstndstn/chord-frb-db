@@ -11,6 +11,7 @@ from copy import deepcopy
 import cfbm
 
 from chord_frb_db.utils import get_db_engine
+from chord_frb_sifter.pipeline import simple_process_events
 
 def to_db_type(v):
     # convert to normal python types for database interaction
@@ -20,6 +21,7 @@ def to_db_type(v):
         v = int(v)
     return v
 
+# OLD, NOT USED
 # Save events into our CHORD database
 def send_to_db(session, events):
     from chord_frb_db.models import EventBeam, Event
@@ -210,6 +212,7 @@ def send_to_db(session, events):
         session.flush()
         session.commit()
 
+<<<<<<< HEAD
 def setup():
     from chord_frb_sifter import config
     config.load_actor_configuration()
@@ -277,6 +280,8 @@ def simple_process_events(pipeline, events):
         input_events = output_events
     return output_events
 
+=======
+>>>>>>> main
 # We should gather up all the CHIME and CHORD specific functionality we need into
 # two subclasses.  For now...
 def chime_beam_numbers_to_sky_grid(beams):
@@ -425,6 +430,8 @@ if __name__ == '__main__':
     from sqlalchemy.orm import Session
     from chord_frb_db.models import Base, EventBeam, Event
     from sqlalchemy import delete
+
+    from chord_frb_sifter.pipeline import setup, simple_create_pipeline
 
     database_engine = get_db_engine()
 

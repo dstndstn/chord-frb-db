@@ -2,7 +2,7 @@ import yaml
 from chord_frb_grpc.frb_sifter_server import FrbSifter, serve
 
 import grpc
-from chord_frb_grpc.frb_sifter_pb2 import ConfigMessage, FrbEventsMessage, FrbEvent
+from chord_frb_grpc.frb_sifter_pb2 import ConfigMessage, FrbEventsMessage, FrbEvent, PROTOCOL_VERSION_CURRENT
 from chord_frb_grpc.frb_sifter_pb2_grpc import FrbSifterStub
 
 if __name__ == '__main__':
@@ -28,7 +28,8 @@ if __name__ == '__main__':
     # FRB Search node 1
     ch1 = grpc.insecure_channel(sifter_addr)
     stub1 = FrbSifterStub(ch1)
-    msg = ConfigMessage(xengine_yaml=xengine_yaml_config_str,
+    msg = ConfigMessage(protocol_version=PROTOCOL_VERSION_CURRENT,
+                        xengine_yaml=xengine_yaml_config_str,
                         pirate_yaml=pirate_yaml_config_str)
     r1 = stub1.CheckConfiguration(msg)
     print('Got config check result:', r1.ok)
@@ -37,7 +38,8 @@ if __name__ == '__main__':
     # FRB Search node 2
     ch2 = grpc.insecure_channel(sifter_addr)
     stub2 = FrbSifterStub(ch2)
-    msg = ConfigMessage(xengine_yaml=xengine_yaml_config_str,
+    msg = ConfigMessage(protocol_version=PROTOCOL_VERSION_CURRENT,
+                        xengine_yaml=xengine_yaml_config_str,
                         pirate_yaml=pirate_yaml_config_str)
     r2 = stub2.CheckConfiguration(msg)
     print('Got config check result:', r2.ok)
@@ -50,7 +52,8 @@ if __name__ == '__main__':
     # FRB Search node 3
     ch3 = grpc.insecure_channel(sifter_addr)
     stub3 = FrbSifterStub(ch3)
-    msg = ConfigMessage(xengine_yaml=xengine_yaml_2,
+    msg = ConfigMessage(protocol_version=PROTOCOL_VERSION_CURRENT,
+                        xengine_yaml=xengine_yaml_2,
                         pirate_yaml=pirate_yaml_config_str)
     r3 = stub3.CheckConfiguration(msg)
     print('Got config check result:', r3.ok)
