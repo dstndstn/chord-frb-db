@@ -39,8 +39,8 @@ def send_to_db(session, events):
     # snr_vs_tree_index_x
     # snr_vs_spectral_index_x
     l1_name_map = {
-        'beam': True,
-        'beam_no': 'beam',
+        'beam_id': True,
+        'beam_no': 'beam_id',
         'snr': True,
         'timestamp_fpga': True,
         'timestamp_utc': True,
