@@ -66,9 +66,16 @@ class Localizer(Actor):
             x_out, y_out = x[0], y[0]
             x_err, y_err = sigma_x, sigma_y
         else:
-            x_out, y_out, x_err, y_err = fit_2dgauss_simplified(
+            x_out, y_out, x_err, y_err = fit_2dgauss_analytical_jac(
                 x, y, snrs, sigma_x, sigma_y
             )
+            # Rank-deficient Jacobian (one-sided cluster at FOV edge): fall
+            # back to the peak-SNR beam centre with beam sigma rather than
+            # propagating NaN error bars downstream.
+            if np.isnan(x_err) or np.isnan(y_err):
+                peak_i = np.argmax(snrs)
+                x_out, y_out = x[peak_i], y[peak_i]
+                x_err, y_err = sigma_x, sigma_y
 
         # Unit-sphere grid coords -> topocentric -> ITRS -> (RA, Dec)
         z_out = np.sqrt(max(0.0, 1.0 - x_out**2 - y_out**2))
@@ -100,13 +107,93 @@ def residuals_gauss2d_analytical_width(p0, xy, sigma_x, sigma_y, snr):
     return snr - A * gauss_xy
 
 
-def fit_2dgauss_simplified(x, y, snr, sigma_x, sigma_y):
-    """
-    Fit a 2D Gaussian to beam S/Ns in unit-sphere grid coordinates.
+def jacobian_gauss2d_analytical_width(p0, xy, sigma_x, sigma_y, snr):
+    """Analytic Jacobian of residuals_gauss2d_analytical_width w.r.t. (x0, y0).
 
-    Amplitude is solved analytically at each trial position; only (x0, y0)
-    are free parameters. Beam widths are passed in and should be computed
-    from the subband central frequency via beam_sigmas().
+    Differentiates through the analytically-solved amplitude A = dot(g,snr)/dot(g,g).
+    Returns (n_beams, 2) array.
+    """
+    x0, y0 = p0
+    x, y = xy[0], xy[1]
+    g = gauss2d(xy, 1.0, x0, y0, sigma_x, sigma_y)
+    G = np.dot(g, g)
+    if G == 0:
+        return np.zeros((len(snr), 2))
+    A = np.dot(g, snr) / G
+
+    dg_dx0 = g * (x - x0) / sigma_x**2
+    dg_dy0 = g * (y - y0) / sigma_y**2
+
+    dA_dx0 = (np.dot(dg_dx0, snr) - 2.0 * A * np.dot(g, dg_dx0)) / G
+    dA_dy0 = (np.dot(dg_dy0, snr) - 2.0 * A * np.dot(g, dg_dy0)) / G
+
+    J = np.empty((len(snr), 2))
+    J[:, 0] = -dA_dx0 * g - A * dg_dx0
+    J[:, 1] = -dA_dy0 * g - A * dg_dy0
+    return J
+
+
+def _covariance_from_jac(jac, residuals):
+    """Compute position covariance from least-squares Jacobian and residuals.
+
+    pcov = sigma² · (J^T J)⁺  where sigma² = ||r||² / (n − 2) and (J^T J)⁺
+    is the Moore-Penrose pseudo-inverse via SVD. Using the pseudo-inverse
+    handles rank-deficient cases (e.g. beams only on one side of the source at
+    the FOV edge) without exceptions or spurious negative covariances:
+    near-zero singular values map to np.nan in that direction only.
+
+    Returns (x_err, y_err). Either may be np.nan if that direction is
+    unconstrained; (nan, nan) if J is identically zero.
+    """
+    n = len(residuals)
+    if n <= 2:
+        return np.nan, np.nan
+    sigma_sq = np.dot(residuals, residuals) / (n - 2)
+
+    _, s, Vt = np.linalg.svd(jac, full_matrices=False)
+    if s[0] == 0:
+        return np.nan, np.nan
+
+    thresh = np.finfo(float).eps * max(jac.shape) * s[0]
+    # For each singular value: finite 1/s² if constrained, inf if not.
+    s_inv_sq = np.where(s > thresh, 1.0 / s**2, np.inf)
+    # diag[(J^T J)^+]_i = sum_j Vt[j,i]^2 / s[j]^2
+    pcov_diag = sigma_sq * np.sum(Vt**2 * s_inv_sq[:, np.newaxis], axis=0)
+
+    x_err = float(np.sqrt(pcov_diag[0])) if np.isfinite(pcov_diag[0]) else np.nan
+    y_err = float(np.sqrt(pcov_diag[1])) if np.isfinite(pcov_diag[1]) else np.nan
+    return x_err, y_err
+
+
+def fit_2dgauss_analytical_jac(x, y, snr, sigma_x, sigma_y):
+    """Fit a 2D Gaussian to beam S/Ns using the analytic Jacobian.
+
+    Drop-in replacement for fit_2dgauss_simplified. Same residual function,
+    same covariance estimate, but supplies the analytic Jacobian so least_squares
+    avoids finite-difference steps — faster and more robust near the boundary.
+    """
+    max_i = np.argmax(snr)
+    p0 = [x[max_i], y[max_i]]
+
+    result = least_squares(
+        residuals_gauss2d_analytical_width,
+        p0,
+        jac=jacobian_gauss2d_analytical_width,
+        args=([x, y], sigma_x, sigma_y, snr),
+        bounds=([-1.0, -1.0], [1.0, 1.0]),
+    )
+
+    x_out, y_out = result.x
+    x_err, y_err = _covariance_from_jac(result.jac, result.fun)
+    return x_out, y_out, x_err, y_err
+
+
+def fit_2dgauss_simplified(x, y, snr, sigma_x, sigma_y):
+    """Fit a 2D Gaussian to beam S/Ns using finite-difference Jacobian.
+
+    Kept for A/B comparison with fit_2dgauss_analytical_jac. Prefer
+    fit_2dgauss_analytical_jac in production — it is faster and avoids FD
+    perturbation steps near the parameter bounds.
     """
     max_i = np.argmax(snr)
     p0 = [x[max_i], y[max_i]]
@@ -119,11 +206,5 @@ def fit_2dgauss_simplified(x, y, snr, sigma_x, sigma_y):
     )
 
     x_out, y_out = result.x
-
-    try:
-        pcov = np.linalg.inv(result.jac.T @ result.jac)
-        x_err, y_err = np.sqrt(np.diag(pcov))
-    except np.linalg.LinAlgError:
-        x_err, y_err = np.nan, np.nan
-
+    x_err, y_err = _covariance_from_jac(result.jac, result.fun)
     return x_out, y_out, x_err, y_err
