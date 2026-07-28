@@ -34,7 +34,7 @@ def create_l2_event(l1_events, **kwargs):
     # Keep only the max-SNR event for each beam.
     beam_maxsnr = {}
     for e in l1_events:
-        beam = e['beam']
+        beam = e['beam_id']
         snr = e['snr']
         if beam in beam_maxsnr:
             (oldsnr,_) = beam_maxsnr[beam]
@@ -140,7 +140,7 @@ class BeamGrouper(Actor):
         groups = self._cluster(events)
 
         dead_beams = [] # Needed for CHIME RFISifter, will probably want for CHORD, but likely won't come from L1 per event.
-        beam_activity = len(set([e['beam'] for e in events]))
+        beam_activity = len(set([e['beam_id'] for e in events]))
         dm_activity = len(set([e['dm'] for e in events]))
         avg_l1_grade = np.mean([e['rfi_grade_level1'] for e in events])
         self.dm_activity_lookback.append(dm_activity)

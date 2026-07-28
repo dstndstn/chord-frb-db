@@ -37,7 +37,7 @@ class Localizer(Actor):
         beams = []
         snrs = []
         for e in event["l1_events"]:
-            beams.append(e["beam"])
+            beams.append(e["beam_id"])
             snrs.append(e["snr"])
         beams = np.array(beams)
         snrs = np.array(snrs)
