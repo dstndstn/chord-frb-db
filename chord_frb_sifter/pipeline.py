@@ -60,14 +60,17 @@ def simple_process_events(pipeline, events):
     # This the famed "It's just a FOR loop" framework
     for actor in pipeline:
         output_events = []
+        print('Actor', actor, ': feeding %i events' % len(input_events))
         for in_item in input_events:
             items = actor.perform_action(in_item)
+            print('Actor', actor, 'in event', in_item, '-> out events', items)
             if items is None:
                 continue
             for item in items:
                 if item is None:
                     continue
                 output_events.append(item)
+        print('Actor', actor, ': produced %i events' % len(output_events))
         if len(output_events) == 0:
             break
         input_events = output_events
