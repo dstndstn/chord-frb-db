@@ -70,6 +70,8 @@ unit-sphere coords, direction cosines, x_tel/y_tel (too many names for these...)
 - I think the unit-sphere coords are used in the BX-engine to specify beam 
 locations, so that would be most natural anyways.
 - so may change how spatial clustering is done if coords change.
+- the CHORD sifter pipeline config will need grouping thresholds (ra_thr, dec_thr) 
+set taking into account how the beams are spaced and may change Pathfinder -> Full CHORD.
 
 Issues:
 - dead_beams is set as an empty list. How will we track dead beams in CHORD?
