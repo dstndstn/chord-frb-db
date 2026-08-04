@@ -1,3 +1,4 @@
+import time
 from chord_frb_grpc import frb_sifter_pb2_grpc
 from chord_frb_grpc.frb_sifter_pb2 import ConfigReply, FrbEventsReply
 import queue
@@ -38,6 +39,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # beamset (int) to (Pirate callback address, Pirate gRPC stub)
         self.beamset_pirate_rpc = {}
 
+        # beam_id to (beam_x, beam_y)
+        self.beam_id_to_xy = {}
+
+        # is a gRPC peer address the fake x-engine??
+        self.peer_is_fake = {}
+
     def print_yaml(self, y):
         # just indent...
         lines = y.split('\n')
@@ -65,13 +72,13 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         print('Received Pirate RPC address: "%s"' % pirate_rpc)
 
         ok = True
-        if not self.check_configs(xengine, pirate, dedisp, grouper, pirate_rpc):
+        if not self.check_configs(context.peer(), xengine, pirate, dedisp, grouper, pirate_rpc):
             print('Failed YAML config check')
             ok = False
         r = ConfigReply(ok=ok)
         return r
 
-    def check_configs(self, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml, pirate_rpc):
+    def check_configs(self, peer, xengine_yaml, pirate_yaml, dedisp_yaml, grouper_yaml, pirate_rpc):
         xengine = yaml.load(xengine_yaml, Loader=Loader)
         beamset = xengine['beamset']
         new_meta = (xengine['beam_ids'],
@@ -95,6 +102,26 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         if is_fake:
             print('Only x-engine yaml is non-empty -- assuming fake x-engine message')
 
+        assert(peer not in self.peer_is_fake)
+        self.peer_is_fake[peer] = is_fake
+
+        if not is_fake:
+            # Populate beam info: beam x,y
+            for beam_id, beam_x, beam_y in zip(xengine['beam_ids'],
+                                               xengine['beam_positions_x'],
+                                               xengine['beam_positions_y']):
+                new_val = (beam_x, beam_y)
+                if beam_id in self.beam_id_to_xy:
+                    old_val = self.beam_id_to_xy[beam_id]
+                    if new_val != old_val:
+                        print('Already received beam_id %i with conflicting value: old %s, new %s' %
+                              (beam_id, old_val, new_val))
+                        return False
+                self.beam_id_to_xy[beam_id] = new_val
+
+            # delta-RA,delta-Dec of beam positions relative to boresight.
+
+                
         if not is_fake:
             import grpc
             from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
@@ -126,12 +153,20 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         msg = ''
         ok = True
 
-        print(('Got FRB Events grpc: beam-set %i, chunk FPGA %i to %i, %i events, ' +
-               'coarse-grain SNR array: length %i') %
+        print(('Got FRB Events grpc: beam-set %i, chunk FPGA %i to %i, ' +
+               'coarse-grain SNR array: %i beams; ' +
+               'events: %i, ' +
+               'peer: %s, is_fake? %s') %
               (request.beam_set_id, request.chunk_fpga_start, request.chunk_fpga_end,
-               len(request.events), len(request.coarsegrain_snr)))
+               len(request.coarsegrain_snr),
+               len(request.events), 
+               context.peer(),
+               self.peer_is_fake.get(context.peer(), 'unknown')))
         #for e in request.events:
         #    print('  event', type(e), e)
+
+        is_fake = self.peer_is_fake.get(context.peer())
+
         if len(request.events):
             header = dict()
             keys = ['chunk_fpga_start']
@@ -146,10 +181,16 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                 for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
                             'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
                     simple_event[key] = getattr(e, key)
+
+                simple_event['is_fake'] = is_fake
+                # yuck
+                # CHIME/FRB's rfi_grade_level2
+                # values are 0 to 10, with RFI:0 and Astrophysical:10.
+                simple_event['rfi_grade_level1'] = 10. * (1. - simple_event['rfi_prob'])
+
                 event_list.append(simple_event)
             self.event_queue.put((event_list, header))
 
-        #print('Peer:', context.peer())
         if len(request.coarsegrain_snr):
             self.beam_snr_queue.put(dict(beamset=request.beam_set_id,
                                          fpga_start=request.chunk_fpga_start,
@@ -177,11 +218,37 @@ def event_handler(sifter, event_queue, pipeline):
     # fpga to utc conversions
     t0 = None
     dt = None
+    # beam id to xy position
+    beam_id_to_xy = sifter.beam_id_to_xy
+    
     while True:
         events,header = event_queue.get()
         print('event_handler: got', len(events), 'events')
-        # Convert grpc FrbEvent objects into simple dicts.
+        good_events = []
+        later_events = []
         for e in events:
+
+            if e['is_fake']:
+                print('Fake event: ignoring!', e)
+                continue
+
+            # add beam metadata
+
+            # ... if beam metadata is not yet known (the config
+            # sending seems to actually get sent in a separate thread
+            # from the event sending....), re-queue this event for
+            # processing later.
+            beam_id = e['beam_id']
+            if not beam_id in beam_id_to_xy:
+                print('Nothing is known about beam %i yet... saving this event for reprocessing'
+                      % beam_id)
+                later_events.append(e)
+                continue
+            
+            x,y = beam_id_to_xy[e['beam_id']]
+            e['beam_grid_x'] = x
+            e['beam_grid_y'] = y
+
             # Add values from the chunk-header
             for key in ['chunk_fpga_start']:
                 e[key] = header[key]
@@ -190,8 +257,15 @@ def event_handler(sifter, event_queue, pipeline):
                 t0 = sifter.xengine_config['unix_ns_at_seq_0']
                 dt = sifter.xengine_config['dt_ns_per_seq']
             e['chunk_utc'] = (t0 + dt * header['chunk_fpga_start']) * 1e-9
-            e['timestamp_utc'] = (t0 + dt * e['fpg_timestamp']) * 1e-9
-        simple_process_events(pipeline, events)
+            e['timestamp_utc'] = (t0 + dt * e['fpga_timestamp']) * 1e-9
+            good_events.append(e)
+        if len(good_events):
+            simple_process_events(pipeline, good_events)
+        if len(later_events):
+            if event_queue.empty():
+                time.sleep(1.)
+            print('Putting %i events back on the queue for later processing' % (len(later_events)))
+            event_queue.put((later_events, header))
 
 def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()

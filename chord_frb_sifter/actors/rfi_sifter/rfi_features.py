@@ -299,7 +299,12 @@ def get_l1_features(l1_events):
 
         l1_events = l1_events[np.where(l1_events["is_incoherent"] == False)]
 
+<<<<<<< HEAD
         beam_nos = l1_events["beam_id"] if "beam_id" in l1_events.dtype.names else l1_events["beam_no"]
+=======
+        print('rfi_features: l1_events type', type(l1_events))
+        beam_nos = l1_events["beam_no"]
+>>>>>>> main
         snr_sort = np.argsort(l1_events["snr"])
 
         ret["max_coherent_snr"] = l1_events["snr"][snr_sort[-1]]

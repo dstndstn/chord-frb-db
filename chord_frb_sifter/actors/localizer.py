@@ -62,6 +62,7 @@ class Localizer(Actor):
         # TODO: read central_freq_mhz per-event from l1 once the field exists
         sigma_x, sigma_y = beam_sigmas(self.central_freq_mhz)
 
+<<<<<<< HEAD
         if len(snrs) == 1:
             x_out, y_out = x[0], y[0]
             x_err, y_err = sigma_x, sigma_y
@@ -76,6 +77,16 @@ class Localizer(Actor):
                 peak_i = np.argmax(snrs)
                 x_out, y_out = x[peak_i], y[peak_i]
                 x_err, y_err = sigma_x, sigma_y
+=======
+        # fix this after making L1Events recarray?
+        beams = []
+        snrs = []
+        for e in event["l1_events"]:
+            beams.append(e["beam_id"])
+            snrs.append(e["snr"])
+        beams = np.array(beams)
+        snrs = np.array(snrs)
+>>>>>>> main
 
         # Unit-sphere grid coords -> topocentric -> ITRS -> (RA, Dec)
         z_out = np.sqrt(max(0.0, 1.0 - x_out**2 - y_out**2))
