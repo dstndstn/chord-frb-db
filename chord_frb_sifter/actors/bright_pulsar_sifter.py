@@ -41,32 +41,35 @@ class BrightPulsarSifter(Actor):
         ),'r'), Loader=yaml.Loader)
         self.tele = ChordTelescope(conf["telescope"])
 
-    def _perform_action(self, event):
-  
-        dm = event['dm']
-        t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
+    def __str__(self):
+        return 'BrightPulsarSifter'
 
-        # # Getting LST from ephem object for CHIME in cfbm. Bit clunky.
-        # # Repalce w/ astropy or some CHORD utility?
-        # cfbm.config.chime.date = t
-        # lst = cfbm.config.chime.sidereal_time() * (12 / np.pi) # radians -> hours
+    def _perform_action(self, event_group):
 
-        # astropy version using ChordTelescope object for telescope location
-        loc = EarthLocation(
-            lat=self.tele.origin_itrs_lat_deg, 
-            lon=self.tele.origin_itrs_lon_deg
-            )
-        lst = Time(t, scale='utc', location=loc).sidereal_time('apparent').hour
+        for event in event_group.events:
+            dm = event['dm']
+            t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
 
-        for pulsar, params in self.bright_pulsars.items():
-            ha = lst - params['ra']
-            ha = (ha + 12) % 24 - 12 # wrap HA
+            # # Getting LST from ephem object for CHIME in cfbm. Bit clunky.
+            # # Repalce w/ astropy or some CHORD utility?
+            # cfbm.config.chime.date = t
+            # lst = cfbm.config.chime.sidereal_time() * (12 / np.pi) # radians -> hours
 
-            if params['ha_window'][0] < ha < params['ha_window'][1]:
-                if abs(dm - params['dm']) < params['dm_tol']:
-                    event['is_bright_pulsar'] = True
-                    event['bright_pulsar_name'] = pulsar
-                    return [event]
+            # astropy version using ChordTelescope object for telescope location
+            loc = EarthLocation(
+                lat=self.tele.origin_itrs_lat_deg, 
+                lon=self.tele.origin_itrs_lon_deg
+                )
+            lst = Time(t, scale='utc', location=loc).sidereal_time('apparent').hour
 
-        event['is_bright_pulsar'] = False
-        return [event]
+            event['is_bright_pulsar'] = False
+            for pulsar, params in self.bright_pulsars.items():
+                ha = lst - params['ra']
+                ha = (ha + 12) % 24 - 12 # wrap HA
+
+                if params['ha_window'][0] < ha < params['ha_window'][1]:
+                    if abs(dm - params['dm']) < params['dm_tol']:
+                        event['is_bright_pulsar'] = True
+                        event['bright_pulsar_name'] = pulsar
+                        break
+        return [event_group]

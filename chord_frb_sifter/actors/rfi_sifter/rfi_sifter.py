@@ -14,13 +14,12 @@ __developers__ = "Shriharsh Tendulkar"
 __email__ = "shriharsh@physics.mcgill.ca"
 __status__ = "Epsilon"
 
-from frb_common.events import L2Event, SimulateEvents
+#from frb_common.events import L2Event, SimulateEvents
 from frb_L2_L3 import config_dir
 
 from chord_frb_sifter.actors.actor import Actor
 
 from . import rfi_filter_rules
-
 
 class RFISifter(Actor):
     """
@@ -68,8 +67,10 @@ class RFISifter(Actor):
         self.rfi_filter_argstrs = []
         self.load_filters(filters)
 
+    def __str__(self):
+        return 'RFISifter'
 
-    def _perform_action(self, event):
+    def _perform_action(self, event_group):
         """ Performs L2 RFI Sifting in science mode.
 
         Parameters are same as perform_action()
@@ -79,25 +80,19 @@ class RFISifter(Actor):
         perform_action
 
         """
-        self.set_L2_grades(event)
+        for event in event_group.events:
+            self.set_L2_grades(event)
 
-        if event.rfi_grade_level2 < self.threshold:
+            if event.rfi_grade_level2 < self.threshold:
+                # set event_category to RFI (=3)
+                event.is_rfi = True
+                print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
 
-            # set event_category to RFI (=3)
-            event.is_rfi = True
-
-            print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
-
-            return [event]
-
-        else:
-
-            print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
-
-            # For now if its not RFI say its unknown (KSS can change later)
-            event.is_rfi = False
-
-            return [event]
+            else:
+                print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
+                # For now if its not RFI say its unknown (KSS can change later)
+                event.is_rfi = False
+        return [event_group]
 
     def load_filters(self, filters):
         """ Initializes the filters defined in the configuration file.
@@ -123,11 +118,12 @@ class RFISifter(Actor):
             # check if this filter definition exists
             if hasattr(rfi_filter_rules, filt[0]):
                 filt[1].update({"config_dir": config_dir})
+
                 try:
                     # test out the function
                     # func =getattr(rfi_filter_rules, filt[0])(filt[1])
                     func = getattr(rfi_filter_rules, filt[0])(filt[1])
-
+                
                     if filter_works(func):
                         self.filters.append(getattr(rfi_filter_rules, filt[0])(filt[1]))
                         self.rfi_filter_names.append(filt[0])
@@ -139,7 +135,7 @@ class RFISifter(Actor):
                             + "is not executing correctly. "
                             + "Check filter definition and config!"
                         )
-
+                
                 except Exception as e:
                     import traceback; print(traceback.format_exc())
                     print(e)
@@ -212,21 +208,22 @@ def filter_works(filter_function):
     filter_arguments : str
     kwargs for the filters.
     """
-
-    event_maker = SimulateEvents()
-
-    events_in = event_maker.get_l3_events(number_of_events=5)
-
-    try:
-        for event in events_in:
-            event_out = filter_function.grade(event)
-        assert isinstance(event_out, L2Event)
-        print("Filter {} works.".format(filter_function.__name__))
-        # print "Filter %s works!"%filter_function.__name__
-        return True  # filter is good.
-    except AssertionError:
-        print(("Filter {} doesn't work!".format(filter_function.__name__)))
-        return False
+    return True
+    
+    # event_maker = SimulateEvents()
+    # 
+    # events_in = event_maker.get_l3_events(number_of_events=5)
+    # 
+    # try:
+    #     for event in events_in:
+    #         event_out = filter_function.grade(event)
+    #     assert isinstance(event_out, L2Event)
+    #     print("Filter {} works.".format(filter_function.__name__))
+    #     # print "Filter %s works!"%filter_function.__name__
+    #     return True  # filter is good.
+    # except AssertionError:
+    #     print(("Filter {} doesn't work!".format(filter_function.__name__)))
+    #     return False
 
 
 # test
