@@ -54,7 +54,10 @@ def create_l2_event(l1_events, **kwargs):
     l1_events = keep
     # FIXME - this is silly
     l2_event = L2Event(best_event) # assuming best L1 event is a dictionary
-    for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
+    for k in ['beam_grid_x', 'beam_grid_y',
+              # vestigal!
+              #'beam_dra', 'beam_ddec',
+              'snr']:
         l2_event['max_' + k] = best_event[k]
         del l2_event[k]
     #

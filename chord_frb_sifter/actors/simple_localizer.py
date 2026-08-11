@@ -30,6 +30,7 @@ class SimpleLocalizer(Actor):
         pass
 
     def _perform_action(self, item):
+        # FIXME -- not clear that we actually have/want beam dra,ddec
         #print('SimpleLocalizer: got', item)
         l1_events = item['l1_events']
         if len(l1_events) == 1:
