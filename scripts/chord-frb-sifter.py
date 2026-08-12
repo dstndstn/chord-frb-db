@@ -140,14 +140,17 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
             # Check that we can call back to Pirate...
             print('Pirate RPC address:', pirate_rpc)
-            # Open connection...
-            ch1 = grpc.insecure_channel(pirate_rpc)
-            pirate = FrbSearchStub(ch1)
-            # Make a pirate Status call
-            req = GetStatusRequest()
-            resp = pirate.GetStatus(req)
-            print('Got pirate RPC response:', resp)
-            self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
+            # testing...
+            if len(pirate_rpc):
+                # Open connection...
+                ch1 = grpc.insecure_channel(pirate_rpc)
+                pirate = FrbSearchStub(ch1)
+                # Make a pirate Status call
+                req = GetStatusRequest(protocol_version=2)
+                print('Pirate Status RPC request:', req)
+                resp = pirate.GetStatus(req)
+                print('Got pirate RPC response:', resp)
+                self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
 
         # save parsed and yaml xengine config
         self.xengine_config = xengine
@@ -186,8 +189,12 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
             event = L1Event(is_incoherent=False,
                             is_fake=is_fake)
             for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
-                        'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
+                        'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz',
+                        'tree_index']:
                 event[key] = getattr(e, key)
+            # HACK
+            event.dm_error = 0.1
+
             # yuck
             # CHIME/FRB's rfi_grade_level2
             # values are 0 to 10, with RFI:0 and Astrophysical:10.
@@ -400,8 +407,29 @@ def main():
                                        name='beam-snr-handler')
     beam_snr_thread.start()
 
+    if True:
+        fake_xengine_conf = {'version': 2, 'zone_nfreq': [640], 'zone_freq_edges': [400, 800], 'beamset': 0, 'beam_ids': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 'beam_positions_x': [-0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999], 'beam_positions_y': [-0.1, -0.1, -0.1, -0.1, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999], 'unix_ns_at_seq_0': 1786482526471023104, 'dt_ns_per_seq': 5120, 'seq_per_frb_time_sample': 195, 'tel_origin_itrs_lat_deg': 49.32075144444, 'tel_origin_itrs_lon_deg': -119.62081125, 'tel_grid_x_axis': [0.9999743423983594, -3.7539331442772e-05, -0.007163318767675494], 'tel_grid_y_axis': [6.540338773921e-05, 0.9999924332203488, 0.003889630373557614], 'tel_dish_elev_axis': [0.9999999983813239, -5.6897733584327e-05, 0], 'tel_dish_vert_axis': [0, 0, 1], 'tel_dish_coelev_deg': 0, 'tel_dish_separation_x_m': 6.300156854906823, 'tel_dish_separation_y_m': 8.500057809796308, 'noise_variance': [1]}
+        xe_yaml = yaml.dump(fake_xengine_conf)
+        sifter.check_configs(None, xe_yaml, 'x: 4', '', '', '')
+                         
+        g = EventGroup(**{'is_fake': False, 'chunk_fpga_start': 5890560, 'beamset': 0,
+                          'events': [], 'chunk_utc': 1786482556.6306903})
+        sifter.event_queue.put(g)
+
+        g = EventGroup(**{'is_fake': False, 'chunk_fpga_start': 5940480, 'beamset': 0,
+                          'events': [
+                              L1Event(**{'beam_id': 4, 'fpga_timestamp': 5953740, 'dm': 1.437467336654663, 'snr': 29.343143463134766, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'beam_grid_x': -0.1, 'beam_grid_y': -0.03333333333333334, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482556.9541721, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1}),
+                              L1Event(**{'beam_id': 8, 'fpga_timestamp': 5989620, 'dm': 25.25835418701172, 'snr': 25.013864517211914, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'beam_grid_x': -0.1, 'beam_grid_y': 0.033333333333333326, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482557.1378777, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1}),
+                          ], 'chunk_utc': 1786482556.8862808})
+        sifter.event_queue.put(g)
+
+        import time
+        time.sleep(15)
+        return
+
     server = serve(sifter)
     server.wait_for_termination()
+
 
 if __name__ == '__main__':
     import logging

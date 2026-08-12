@@ -75,50 +75,54 @@ class DMChecker(Actor):
         self.interp_map_ymw16  = LinearNDInterpolator(map_YMW16 [:2].T, map_YMW16 [2].T)
         self.interp_map_ne2001 = LinearNDInterpolator(map_NE2001[:2].T, map_NE2001[2].T)
 
-    def _perform_action(self, event):
+    def __str__(self):
+        return 'DMChecker'
+
+    def _perform_action(self, event_group):
         """
         Runs main action, to determine if source is extragalactic, Galactic or 
         statistically ambiguous.
         """
 
-        # RFI or known source -- don't perform DM check.
-        if event.is_rfi() or event.is_known_source():
-            return [event]
+        for event in event_group.events:
+            # RFI or known source -- don't perform DM check.
+            if event.is_rfi() or event.is_known_source():
+                continue
 
-        dm_measured = event.dm
-        dm_uncertainty = event.dm_error
+            dm_measured = event.dm
+            dm_uncertainty = event.dm_error
 
-        print('Looking up predicted DMs from maps...')
+            print('Looking up predicted DMs from maps...')
 
-        dm_ymw16  = float(self.interp_map_ymw16 (event.ra, event.dec))
-        dm_ne2001 = float(self.interp_map_ne2001(event.ra, event.dec))
+            dm_ymw16  = float(self.interp_map_ymw16 (event.ra, event.dec))
+            dm_ne2001 = float(self.interp_map_ne2001(event.ra, event.dec))
 
-        dm_pred = np.array([dm_ne2001, dm_ymw16])
-        dm_systematic_error = np.fabs(dm_pred[1] - dm_pred[0])
+            dm_pred = np.array([dm_ne2001, dm_ymw16])
+            dm_systematic_error = np.fabs(dm_pred[1] - dm_pred[0])
 
-        # set to uncertainty floor if raw systematic uncertainty is too small.
-        if dm_systematic_error / np.max(dm_pred) < self.systematic_uncertainty_limit:
-            dm_systematic_error = self.systematic_uncertainty_limit * np.max(dm_pred)
+            # set to uncertainty floor if raw systematic uncertainty is too small.
+            if dm_systematic_error / np.max(dm_pred) < self.systematic_uncertainty_limit:
+                dm_systematic_error = self.systematic_uncertainty_limit * np.max(dm_pred)
 
-        if not self.use_measured_uncertainty:
-            dm_uncertainty = 0.0
+            if not self.use_measured_uncertainty:
+                dm_uncertainty = 0.0
 
-        # finally, compare with threshold and return boolean.
-        dm_diff = (dm_measured - dm_pred) / np.hypot(dm_uncertainty, dm_systematic_error)
+            # finally, compare with threshold and return boolean.
+            dm_diff = (dm_measured - dm_pred) / np.hypot(dm_uncertainty, dm_systematic_error)
         
-        # classify into galactic / ambiguous / extragalactic = FRB
-        if all(dm_diff > self.frb_threshold):
-            event.set_frb()
+            # classify into galactic / ambiguous / extragalactic = FRB
+            if all(dm_diff > self.frb_threshold):
+                event.set_frb()
 
-        elif (any(dm_diff <  self.frb_threshold) and
-              all(dm_diff >= self.ambiguous_threshold)):
-            event.set_ambiguous()
+            elif (any(dm_diff <  self.frb_threshold) and
+                  all(dm_diff >= self.ambiguous_threshold)):
+                event.set_ambiguous()
 
-        else:
-            event.set_galactic()
+            else:
+                event.set_galactic()
 
-        # update 'max_dm' attribute in accordance with configured DM model.
-        event.dm_gal_ymw_2016_max = dm_ymw16
-        event.dm_gal_ne_2001_max = dm_ne2001
+            # update 'max_dm' attribute in accordance with configured DM model.
+            event.dm_gal_ymw_2016_max = dm_ymw16
+            event.dm_gal_ne_2001_max = dm_ne2001
 
-        return [event]
+        return [event_group]

@@ -113,57 +113,46 @@ class L1Event(AttribDict):
     #     return array.view(cls)
 
     def database_payload(self):
-        return self
-        # l1_name_map = {
-        #     'id': True,
-        #     'beam': True,
-        #     'beam_no': 'beam',
-        #     'snr': True,
-        #     'timestamp_fpga': True,
-        #     'timestamp_utc': True,
-        #     'time_error': True,
-        #     'tree_index': True,
-        #     'rfi_grade_level1': 'rfi_grade',
-        #     'rfi_mask_fraction': True,
-        #     'rfi_clip_fraction': True,
-        #     'dm': True,
-        #     'dm_error': True,
-        #     'pos_ra_deg': 'ra',
-        #     'pos_ra_error_deg': 'ra_error',
-        #     'pos_dec_deg': 'dec',
-        #     'pos_dec_error_deg': 'dec_error',
-        # }
-        # 
-        # n = self.size
-        # # Convert back to a list of dicts.
-        # l1list = [{} for i in range(n)]
-        # for col in self.dtype.names:
-        #     vals = self[col]
-        #     for i,val in enumerate(vals):
-        #         l1list[i][col] = val
-        # 
-        # l1_objs = []
-        # for l1 in l1list:
-        #     l1_db_args = {}
-        #     for key,val in l1.items():
-        #         if key == 'timestamp_utc':
-        #             # microsec -> sec
-        #             val *= 1e-6
-        #         val = to_db_type(val)
-        #         k2 = l1_name_map.get(key, None)
-        #         if k2 is not None:
-        #             # same key name
-        #             if k2 is True:
-        #                 k2 = key
-        #             l1_db_args[k2] = val
-        # 
-        #     ## FIXME -- fake up some required fields!
-        #     for key in ['time_error', 'dm_error', 'ra', 'dec', 'ra_error', 'dec_error']:
-        #         if not key in l1_db_args:
-        #             l1_db_args[key] = 0.
-        # 
-        #     l1_objs.append(l1_db_args)
-        # return l1_objs
+        # my name -> db name
+        l1_name_map = {
+            'id': True,
+            'beam_id': 'beam',
+            'snr': True,
+            'fpga_timestamp': 'timestamp_fpga',
+            'timestamp_utc': True,
+            #'time_error': True,
+            'tree_index': True,
+            'rfi_grade_level1': 'rfi_grade',
+            #'rfi_mask_fraction': True,
+            #'rfi_clip_fraction': True,
+            'dm': True,
+            'dm_error': True,
+            #'ra': True,
+            #'ra_error': True,
+            #'dec': True,
+            #'dec_error': True,
+        }
+
+        db_args = {}
+        for key,val in self.items():
+            #if key == 'timestamp_utc':
+            #    # microsec -> sec
+            #    val *= 1e-6
+            val = to_db_type(val)
+            k2 = l1_name_map.get(key, None)
+            if k2 is not None:
+                # same key name
+                if k2 is True:
+                    k2 = key
+                db_args[k2] = val
+
+        ## FIXME -- fake up some required fields!
+        for key in ['time_error', 'rfi_mask_fraction', 'rfi_clip_fraction',
+                    'ra','dec', 'ra_error', 'dec_error']:
+            if not key in db_args:
+                db_args[key] = 0.
+
+        return db_args
 
 class L2Event(AttribDict):
     def is_rfi(self):

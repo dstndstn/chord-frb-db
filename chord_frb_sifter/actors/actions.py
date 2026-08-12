@@ -27,6 +27,9 @@ class ActionPicker(Actor):
         self.intensity_executor = cf.ThreadPoolExecutor(max_workers=10)
         self.intensity_futures = []
 
+    def __str__(self):
+        return 'ActionPicker'
+
     def shutdown(self):
         #self.db_executor.shutdown(wait=True)
         print('Shutting down ActionPicker... sending None on db queue')
@@ -41,19 +44,18 @@ class ActionPicker(Actor):
         print('Shutdown of intensity callback thread pool finished')
         print('done shutdown of ActionPicker')
 
-    def _perform_action(self, event):
-        # Log everything in db?
-        self.save_to_db(event)
+    def _perform_action(self, event_group):
+        for event in event_group.events:
+            # Log everything in db?
+            self.save_to_db(event)
 
-        if event.is_frb() or event.is_ambiguous():
-            print('FRB or Ambiguous event -- sending intensity callback!')
-            self.send_intensity_callback(event)
-        # if event.is_rfi():
-        #     return event
-        # 
-        # if event.is_frb():
-        #     pass
-        return [event]
+            # Intensity callback
+            if event.is_frb() or event.is_ambiguous():
+                print('FRB or Ambiguous event -- sending intensity callback!')
+                self.send_intensity_callback(event)
+            # if event.is_rfi():
+            #     continue
+        return [event_group]
 
     def save_to_db(self, event):
         # FIXME -- put_nowait ? queue size? timeout?
@@ -98,8 +100,9 @@ class ActionPicker(Actor):
         # Save L1 events
         l1_events = event.get('l1_events', [])
         l1_db_objs = []
-        l1_payload = l1_events.database_payloads()
+        l1_payload = [e.database_payload() for e in l1_events]
         for args in l1_payload:
+            print('L1 event db from:', args)
             db_obj = EventBeam(**args)
             session.add(db_obj)
             session.flush()
@@ -133,4 +136,8 @@ class ActionPicker(Actor):
     #     print('Intensity callback thread ending')
 
     def intensity_callback(self, event):
-        print('Intensity callback: event_id', event.event_id)
+        print('Intensity callback: event', event)#event_id', event.event_id)
+
+        # example event data we have at this point:
+        # {'beam_id': 8, 'fpga_timestamp': 5989620, 'dm': 25.25835418701172, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482557.1378777, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1, 'pipeline_timestamp': 1712085.576748714, 'pipeline_id': 1, 'max_beam_grid_x': -0.1, 'max_beam_grid_y': 0.033333333333333326, 'max_snr': 25.013864517211914, 'beam_activity': 2, 'dm_activity': 2, 'beam_activity_lookback': deque([0, 0, 0, 0, 0, 0, 0, 0, 0, 2], maxlen=10), 'dm_activity_lookback': deque([0, 0, 0, 0, 0, 0, 0, 0, 0, 2], maxlen=10), 'avg_l1_grade': 10.0, 'n_live_beams': 16, 'l1_events': [{'beam_id': 8, 'fpga_timestamp': 5989620, 'dm': 25.25835418701172, 'snr': 25.013864517211914, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'beam_grid_x': -0.1, 'beam_grid_y': 0.033333333333333326, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482557.1378777, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1, 'pipeline_timestamp': 1712085.576748714, 'pipeline_id': 1, 'id': 3621}], 'event_id': 3622, 'rfi_grade_level2': 9.996442488679584, 'rfi_grade_metrics_level2': {'ML_Classifier_grade': 0.9996442488679583}, 'is_rfi': False, 'is_bright_pulsar': False, 'ra': 348.80541191130703, 'dec': -4.1414448711052705, 'ra_err': nan, 'dec_err': nan, 'flag_ambiguous': True, 'dm_gal_ymw_2016_max': 23.48247156629519, 'dm_gal_ne_2001_max': 32.893106974458235}
+        

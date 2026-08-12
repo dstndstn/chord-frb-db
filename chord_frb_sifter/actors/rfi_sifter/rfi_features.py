@@ -199,9 +199,11 @@ def event_to_features(event, return_y=False):
     l1_events = event.l1_events
 
     l1_features = get_l1_features(l1_events)
-    snr_vs_dm_curve = l1_events.snr_vs_dm[np.argmax(l1_events.snr)]
-    snr_vs_dm_metric = get_snr_vs_dm_metric(snr_vs_dm_curve, l1_events.tree_index[np.argmax(l1_events.snr)])
-    l1_features["snr_vs_dm"] = snr_vs_dm_metric
+
+    # We don't currently have a SNR-vs-DM curve...
+    #snr_vs_dm_curve = l1_events.snr_vs_dm[np.argmax(l1_events.snr)]
+    #snr_vs_dm_metric = get_snr_vs_dm_metric(snr_vs_dm_curve, l1_events.tree_index[np.argmax(l1_events.snr)])
+    #l1_features["snr_vs_dm"] = snr_vs_dm_metric
 
     for key in l1_features.dtype.fields:
         ret[key] = l1_features[key]
