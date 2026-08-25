@@ -71,6 +71,8 @@ class Event(Base):
     known_id:       Mapped[Optional[int]] = mapped_column(ForeignKey('known_source.id'))
     known:     Mapped['KnownSource'] = relationship(back_populates='events')
 
+    intensity_files:     Mapped[List['IntensityFile']] = relationship(back_populates='event')
+
     #def __repr__(self) -> str:
     #    return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
 
@@ -115,6 +117,16 @@ class EventBeam(Base):
 
     event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
     event:     Mapped['Event'] = relationship(back_populates='beams')
+
+class IntensityFile(Base):
+    __tablename__ = 'intensity_file'
+    filename:    Mapped[str] = mapped_column(String(1024), primary_key=True)
+    succeeded:   Mapped[bool] = mapped_column(default=False, server_default='false')
+    failed:      Mapped[bool] = mapped_column(default=False, server_default='false')
+    error_message: Mapped[Optional[str]] = mapped_column(String(1024))
+
+    event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
+    event:     Mapped['Event'] = relationship(back_populates='intensity_files')
 
 class KnownSource(Base):
     __tablename__ = 'known_source'

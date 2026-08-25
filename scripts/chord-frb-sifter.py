@@ -34,6 +34,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         #self.dedisp_config = None
         #self.grouper_config = None
 
+        self.subscribe_files_threads = []
+        self.file_update_queue = queue.SimpleQueue()
+        
         # beamset (int) -> arrays of (id, x, y)
         self.beamset_meta = {}
 
@@ -43,6 +46,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # beam_id to (beam_x, beam_y)
         self.beam_id_to_xy = {}
 
+        # beam_id to beamset
+        self.beam_id_to_beamset = {}
+        
         # is a gRPC peer address the fake x-engine??
         self.peer_is_fake = {}
 
@@ -51,6 +57,15 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         dt = self.xengine_config['dt_ns_per_seq']
         utc = (t0 + dt * fpga) * 1e-9
         return utc
+
+    def nanosec_per_fpga_seq(self):
+        dt = self.xengine_config['dt_ns_per_seq']
+        return dt
+
+    # in MHz
+    def get_freq_range(self):
+        edges = self.xengine_config['zone_freq_edges']
+        return (edges[0], edges[-1])
 
     # Called by beam_buffer
     def beamset_to_beam_ids(self, beamset):
@@ -131,13 +146,15 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                         return False
                 self.beam_id_to_xy[beam_id] = new_val
 
+                self.beam_id_to_beamset[beam_id] = beamset
+
             # delta-RA,delta-Dec of beam positions relative to boresight.
 
                 
         if not is_fake:
             import grpc
             from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
-            from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
+            from chord_frb_grpc.frb_search_pb2 import GetStatusRequest, SubscribeFilesRequest
             # Check that we can call back to Pirate...
             print('Pirate RPC address:', pirate_rpc)
             # testing...
@@ -151,7 +168,28 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                 resp = pirate.GetStatus(req)
                 print('Got pirate RPC response:', resp)
                 self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
-
+                # Subscribe to file updates!
+                req = SubscribeFilesRequest(protocol_version=2,
+                                            subscribe_streams=False)
+                print('Subscribing to file updates:', req)
+                resp = pirate.SubscribeFiles(req)
+                print('Subscribed to file updates:', resp)
+                for val in resp:
+                    print('First subscribe-files response:', val)
+                    # check that it's a ReadySentinal
+                    ready = val.ready
+                    print('Ready:', ready)
+                    break
+                print('Response is a', type(resp))
+                print('Response is', resp)
+                # Create a thread to continue reading updates from this pirate?
+                import threading
+                t = threading.Thread(target=file_update_rpc_reader,
+                                     args=(resp, self.file_update_queue, beamset),
+                                     name='file-update-handler-beamset-%i' % beamset)
+                self.subscribe_files_threads.append(t)
+                t.start()
+                
         # save parsed and yaml xengine config
         self.xengine_config = xengine
         self.xengine_config_yaml = xengine_yaml
@@ -218,6 +256,79 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         return FrbEventsReply(ok=ok, message=msg)
 
+# One thread per pirate, just to receive the streaming file-update RPCs.
+def file_update_rpc_reader(stream, file_update_queue, beamset):
+    print('file_update_handler starting for beamset', beamset)
+    try:
+        print('stream:', stream)
+        for val in stream:
+            print('Got file update for beamset', beamset)
+            print('file update:', val)
+            notif = val.notification
+            print('notification:', notif)
+            err = notif.error_message
+            if err:
+                print('filename: %s failed: error message: %s' % (notif.filename, err))
+            else:
+                print('filename %s written sucessfully' % notif.filename)
+            # eg, filename event-00003959/frame_b8_t116.asdf written sucessfully
+            file_update_queue.put((None, notif.filename, notif.error_message))
+    except Exception as e:
+        print('Exception in thread receiving file-writing updated from pirate (beamset %i): %s' % (beamset, e))
+        print(e)
+        import traceback
+        traceback.print_exc(e)
+        # FIXME -- fail more loudly?
+        raise
+
+def file_update_db_handler(file_update_queue, database):
+    import sqlalchemy as sa
+    from sqlalchemy.orm import Session
+    from chord_frb_db.models import IntensityFile
+
+    with Session(database) as session:
+        while True:
+            fup = file_update_queue.get()
+            (event_id, filename, error_message) = fup
+            print('Sending file update to db: event %s, filename %s, err %s' %
+                  (event_id, filename, error_message))
+
+            # We either get
+            # (event_id, filename, None) --> pirate told us it's going to write this file
+            # or
+            # (None, filename, error_message) --> pirate updated us about this file
+            #
+            
+            # create if it doesn't exist, update its status if it does
+            ifile = session.execute(sa.select(IntensityFile).where(
+                IntensityFile.filename==filename)).scalar_one_or_none()
+            print('IntensityFile object with that filename:', ifile)
+            if ifile is not None:
+                print('Got IntensityFile:', ifile)
+                if event_id is not None and event_id != ifile.event_id:
+                    ifile.event_id = event_id
+                if error_message is not None:
+                    ok = (len(error_message) == 0)
+                    ifile.succeeded = ok
+                    ifile.failed = not(ok)
+                    ifile.error_message = error_message
+                print('Updated IntensityFile status')
+            else:
+                kwargs = {}
+                if event_id is not None:
+                    kwargs.update(event_id=event_id)
+                if error_message is not None:
+                    ok = (len(error_message) == 0)
+                    kwargs.update(succeeded=ok,
+                                  failed=not(ok),
+                                  error_message=error_message)
+                ifile = IntensityFile(filename=filename,
+                                      **kwargs)
+                print('Adding IntensityFile to db')
+                session.add(ifile)
+            session.flush()
+            session.commit()
+            
 def serve(sifter, port=10000, max_threads=10):
     import grpc
     from concurrent import futures
@@ -407,7 +518,12 @@ def main():
                                        name='beam-snr-handler')
     beam_snr_thread.start()
 
-    if True:
+    file_update_db_thread = threading.Thread(target=file_update_db_handler,
+                                       args=(sifter.file_update_queue, database_engine),
+                                       name='file-update-db-handler')
+    file_update_db_thread.start()
+
+    if False:
         fake_xengine_conf = {'version': 2, 'zone_nfreq': [640], 'zone_freq_edges': [400, 800], 'beamset': 0, 'beam_ids': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 'beam_positions_x': [-0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999], 'beam_positions_y': [-0.1, -0.1, -0.1, -0.1, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999], 'unix_ns_at_seq_0': 1786482526471023104, 'dt_ns_per_seq': 5120, 'seq_per_frb_time_sample': 195, 'tel_origin_itrs_lat_deg': 49.32075144444, 'tel_origin_itrs_lon_deg': -119.62081125, 'tel_grid_x_axis': [0.9999743423983594, -3.7539331442772e-05, -0.007163318767675494], 'tel_grid_y_axis': [6.540338773921e-05, 0.9999924332203488, 0.003889630373557614], 'tel_dish_elev_axis': [0.9999999983813239, -5.6897733584327e-05, 0], 'tel_dish_vert_axis': [0, 0, 1], 'tel_dish_coelev_deg': 0, 'tel_dish_separation_x_m': 6.300156854906823, 'tel_dish_separation_y_m': 8.500057809796308, 'noise_variance': [1]}
         xe_yaml = yaml.dump(fake_xengine_conf)
         sifter.check_configs(None, xe_yaml, 'x: 4', '', '', '')
