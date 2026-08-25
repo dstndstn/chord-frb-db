@@ -4,11 +4,12 @@ from flask import render_template
 import sys
 import time
 import json
+import os
 import numpy as np
 
 from flask_sqlalchemy import SQLAlchemy
 
-from chord_frb_db.models import Event, EventBeam
+from chord_frb_db.models import Event, EventBeam, IntensityFile
 from chord_frb_db.models import PirateConfig, BeamSNR
 
 import sqlalchemy as sa
@@ -231,6 +232,40 @@ def l1_event_list(event_id):
     return render_template('l1_event_list.html', event_id=event_id,
                            event=event, l1_events=r, fields=fields)
 
+@app.route('/intensity-file-list/<int:event_id>')
+def intensity_file_list(event_id):
+    query = sa.select(IntensityFile).filter_by(event_id=event_id)
+    r = db.session.execute(query).scalars()
+    print('r:', r)
+    r = list(r)
+
+    # Sort -- assuming the filename pattern!
+    # filenames are like event-00010833/frame_b11_t75.asdf 
+    beams,times = [],[]
+    for ifile in r:
+        fn = ifile.filename
+        fn = os.path.basename(fn)
+        fn = fn.split('.')[0]
+        words = fn.split('_')
+        # yuck, man
+        beam = words[1][1:]
+        time = words[2][1:]
+        beam = int(beam)
+        time = int(time)
+        beams.append(beam)
+        times.append(time)
+    I = np.lexsort((beams, times))
+    ifiles = [r[i] for i in I]
+    
+    query = sa.select(Event).filter_by(event_id=event_id)
+    event = db.session.execute(query).scalar_one()
+    print('event:', event)
+
+    fields = ['filename', 'status', 'error_message']
+    return render_template('intensity_file_list.html', event_id=event_id,
+                           event=event, intensity_files=ifiles, fields=fields)
+
+    
 @app.route('/')
 def event_list(): #(name=None):
     query = sa.select(Event).order_by(Event.event_id)#.desc())
@@ -257,11 +292,10 @@ def event_list(): #(name=None):
     event_pager = db.paginate(query, page=page, per_page=20, error_out=False)
     events = event_pager.items
     
-    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'total_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'flux', 'fluence', 'pulse_width' ]
+    #fields = [ 'event_id', 'timestamp', 'rfi_grade', 'total_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'flux', 'fluence', 'pulse_width' ]
+    fields = [ 'event_id', 'timestamp', 'rfi_grade', 'best_snr', 'dm', 'ra', 'dec', 'nbeams', 'dm_ne2001', 'dm_ymw2016', 'n_intensity_files' ]#, 'flux', 'fluence', 'pulse_width' ]
 
     return render_template('event_list.html', event_pager=event_pager, events=events, fields=fields)
-
-
 
 @app.route('/events.png')
 def event_plot():
