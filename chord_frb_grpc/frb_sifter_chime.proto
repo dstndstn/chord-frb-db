@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+service FrbSifterChime {
+  rpc CheckConfiguration (ConfigMessage) returns (ConfigReply) {}
+  rpc FrbEvents (FrbEventsMessage) returns (FrbEventsReply) {}
+}
+
+message ConfigMessage {
+  string yaml = 1;
+}
+
+message ConfigReply {
+  bool ok = 1;
+}
+
+message FrbEventsReply {
+  bool ok = 1;
+  string message = 2;
+}
+
+message FrbEvent {
+  int32  beam_id                   = 1;
+  int64  fpga_timestamp            = 2;
+  float  dm                        = 3;
+  float  dm_error                  = 4;
+  float  snr                       = 5;
+  float  rfi_prob                  = 6;
+  int64  timestamp_utc             = 7;
+  int32  tree_index                = 8;
+  float  snr_scale                 = 9;
+  int32  spectral_index            = 10;
+  int32  scattering_measure        = 11;
+  int32  level1_nhits              = 12;
+  int32  rfi_grade_level1          = 13;
+  float  rfi_mask_fraction         = 14;
+  float  rfi_clip_fraction         = 15;
+  repeated float snr_vs_dm             = 16;
+  repeated float snr_vs_tree_index     = 17;
+  repeated float snr_vs_spectral_index = 18;
+  float  beam_dra                  = 19;
+  float  beam_ddec                 = 20;
+  float  beam_grid_x               = 21;
+  float  beam_grid_y               = 22;
+  bool   is_incoherent             = 23;
+}
+
+message FrbEventsMessage {
+  bool   has_injections    = 1;
+  int32  beam_set_id       = 2;
+  int64  chunk_fpga_count  = 3;
+  repeated FrbEvent events = 4;
+  uint64 frame0_nano       = 5;
+}

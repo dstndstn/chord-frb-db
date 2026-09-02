@@ -6,17 +6,13 @@ sidelobes.
 
 from chord_frb_sifter.actors import Actor
 from chord_frb_sifter.chord_telescope import ChordTelescope
+from chord_frb_sifter import config
 
 import numpy as np
 from datetime import datetime
 
-# import cfbm # Only if using cfbm for LST calculation
-
-# Imports for astropy LST calculation
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
-import yaml
-import os.path
 
 
 class BrightPulsarSifter(Actor):
@@ -25,6 +21,7 @@ class BrightPulsarSifter(Actor):
     """
 
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         # Only a few pulsars that are bright enough to be detected in sidelobes.
         # If the list grows significantly, consider loading from config file or DB.
         self.bright_pulsars = {
@@ -34,12 +31,13 @@ class BrightPulsarSifter(Actor):
             # Add more known bright pulsars as needed
         }
 
-        conf = yaml.load(open(os.path.join(
-            os.path.dirname(__file__), 
-            '../config', 
-            'testChordTelescope.yaml'
-        ),'r'), Loader=yaml.Loader)
-        self.tele = ChordTelescope(conf["telescope"])
+        self.tele = ChordTelescope(config.chord_config.telescope)
+
+        # astropy version using ChordTelescope object for telescope location
+        self.loc = EarthLocation(
+            lat=self.tele.origin_itrs_lat_deg, 
+            lon=self.tele.origin_itrs_lon_deg
+            )
 
     def __str__(self):
         return 'BrightPulsarSifter'
@@ -49,18 +47,7 @@ class BrightPulsarSifter(Actor):
         for event in event_group.events:
             dm = event['dm']
             t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
-
-            # # Getting LST from ephem object for CHIME in cfbm. Bit clunky.
-            # # Repalce w/ astropy or some CHORD utility?
-            # cfbm.config.chime.date = t
-            # lst = cfbm.config.chime.sidereal_time() * (12 / np.pi) # radians -> hours
-
-            # astropy version using ChordTelescope object for telescope location
-            loc = EarthLocation(
-                lat=self.tele.origin_itrs_lat_deg, 
-                lon=self.tele.origin_itrs_lon_deg
-                )
-            lst = Time(t, scale='utc', location=loc).sidereal_time('apparent').hour
+            lst = Time(t, scale='utc', location=self.loc).sidereal_time('apparent').hour
 
             event['is_bright_pulsar'] = False
             for pulsar, params in self.bright_pulsars.items():
@@ -71,5 +58,8 @@ class BrightPulsarSifter(Actor):
                     if abs(dm - params['dm']) < params['dm_tol']:
                         event['is_bright_pulsar'] = True
                         event['bright_pulsar_name'] = pulsar
+                        event['known_source_name'] = pulsar
+                        if not event.is_rfi():
+                            event.set_known_pulsar()
                         break
         return [event_group]

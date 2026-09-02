@@ -1,5 +1,5 @@
 """
-Compares the DM from an incoming packet to those predicted by the NE2001
+Compares the DM from an incoming packet to those predicted by the NE2025
 and YMW2016 electron-density models.
 
 Based on CHIME's dm_checker module, but simpilfied.
@@ -14,30 +14,24 @@ class DMChecker(Actor):
     """
     A subclass of ``ActorBaseClass`` for computing maximum Galactic DMs given
     an L2-estimated line of site, and using the predicted and L2-estimated DMs to
-    determine if an unknown astrophysical source is extragalactic (i.e. an FRB) or not
-    (i.e. ambiguous or Galactic).
+    determine if an unknown astrophysical source is extragalactic (i.e. an FRB) or not.
 
     Parameters
     ----------
 
     systematic_uncertainty_limit : float
-        A fraction of predicted-DM values to use as a lower limit on the systematic 
-        uncertainty in calculations for source classification. This is useful for 
-        in/near-Plane candidates where the difference in the NE2001 and YMW16 is 
+        A fraction of predicted-DM values to use as a lower limit on the systematic
+        uncertainty in calculations for source classification. This is useful for
+        in/near-Plane candidates where the difference in the NE2001 and YMW16 is
         considerably small, though systematic uncertainty in either model is high.
-
-    ambiguous_threshold : float
-        The number of standard deviations used as a threshold for determining
-        if the astrophysical signal is an ambiguous source, i.e. if its DM is marginally
-        larger than the predicted Galactic component. Default is 2.
 
     frb_threshold : float
         The number of standard deviations used as a threshold for determining
         if the astrophysical signal is extragalactic, i.e. if its an FRB. Default is 5.
 
     use_measured_uncertainty : bool
-        If True, add measured and systematic uncertainties in quadrature to obtain 
-        a "full" measure of uncertainty for use in classification. If False, only 
+        If True, add measured and systematic uncertainties in quadrature to obtain
+        a "full" measure of uncertainty for use in classification. If False, only
         use systematic uncertainty in calculations.
 
     Notes
@@ -51,7 +45,6 @@ class DMChecker(Actor):
     def __init__(
         self,
         systematic_uncertainty_limit,
-        ambiguous_threshold,
         frb_threshold,
         use_measured_uncertainty,
         **kwargs
@@ -61,7 +54,6 @@ class DMChecker(Actor):
 
         # store configuration parameters.
         self.systematic_uncertainty_limit = systematic_uncertainty_limit
-        self.ambiguous_threshold = ambiguous_threshold
         self.frb_threshold = frb_threshold
         self.use_measured_uncertainty = use_measured_uncertainty
 
@@ -69,11 +61,10 @@ class DMChecker(Actor):
         import chord_frb_sifter
         config_dir = os.path.join(os.path.dirname(chord_frb_sifter.__file__), 'data', 'dm_checker')
         map_YMW16  = np.load(os.path.join(config_dir, 'YMW16_map.npy' )).T
-        map_NE2001 = np.load(os.path.join(config_dir, 'NE2001_map.npy')).T
-        # These files are N x 4 arrays, [RA, Dec, DM, something]
-        # with RA,Dec in degrees.
+        map_NE2025 = np.load(os.path.join(config_dir, 'NE2025_map.npy')).T
+        # These files are N x 3 arrays, columns = [RA_deg, Dec_deg, DM_max_pc_cm3].
         self.interp_map_ymw16  = LinearNDInterpolator(map_YMW16 [:2].T, map_YMW16 [2].T)
-        self.interp_map_ne2001 = LinearNDInterpolator(map_NE2001[:2].T, map_NE2001[2].T)
+        self.interp_map_ne2025 = LinearNDInterpolator(map_NE2025[:2].T, map_NE2025[2].T)
 
     def __str__(self):
         return 'DMChecker'
@@ -95,9 +86,9 @@ class DMChecker(Actor):
             print('Looking up predicted DMs from maps...')
 
             dm_ymw16  = float(self.interp_map_ymw16 (event.ra, event.dec))
-            dm_ne2001 = float(self.interp_map_ne2001(event.ra, event.dec))
+            dm_ne2025 = float(self.interp_map_ne2025(event.ra, event.dec))
 
-            dm_pred = np.array([dm_ne2001, dm_ymw16])
+            dm_pred = np.array([dm_ne2025, dm_ymw16])
             dm_systematic_error = np.fabs(dm_pred[1] - dm_pred[0])
 
             # set to uncertainty floor if raw systematic uncertainty is too small.
@@ -121,8 +112,7 @@ class DMChecker(Actor):
             else:
                 event.set_galactic()
 
-            # update 'max_dm' attribute in accordance with configured DM model.
             event.dm_gal_ymw_2016_max = dm_ymw16
-            event.dm_gal_ne_2001_max = dm_ne2001
+            event.dm_gal_ne_2025_max = dm_ne2025
 
         return [event_group]

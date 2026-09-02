@@ -228,7 +228,7 @@ def l1_event_list(event_id):
     event = db.session.execute(query).scalar_one()
     print('event:', event)
 
-    fields = ['beam', 'snr', 'timestamp_utc', 'timestamp_fpga']
+    fields = ['beam_id', 'snr', 'timestamp_utc', 'timestamp_fpga']
     return render_template('l1_event_list.html', event_id=event_id,
                            event=event, l1_events=r, fields=fields)
 

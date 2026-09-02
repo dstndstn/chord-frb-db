@@ -2,7 +2,9 @@ from chord_frb_sifter.actors import Actor
 from chord_frb_sifter.event import L1Event, L2Event
 
 from chord_frb_db.utils import get_db_engine
+from chord_frb_db.models import EventBeam, Event, KnownSource
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from queue import Queue
 from threading import Thread
@@ -65,7 +67,7 @@ class ActionPicker(Actor):
             self.save_to_db(event)
 
             # Intensity callback
-            if event.is_frb() or event.is_ambiguous():
+            if event.is_frb() or event.is_new_burst():
                 print('FRB or Ambiguous event -- sending intensity callback!')
                 self.send_intensity_callback(event)
         return [event_group]
@@ -111,8 +113,6 @@ class ActionPicker(Actor):
         print('Database thread ending')
 
     def save_event_to_db(self, session, event):
-        from chord_frb_db.models import EventBeam, Event
-
         # Save L1 events
         l1_events = event.get('l1_events', [])
         l1_db_objs = []
@@ -130,7 +130,16 @@ class ActionPicker(Actor):
         # Save L2 event
         l2_payload = event.database_payload()
         l2_db_obj = Event(**l2_payload)
-        # Add L2 event to db
+
+        # Resolve known_source_name → known_id
+        known_name = event.get('known_source_name', '')
+        if known_name:
+            ks = session.scalars(
+                select(KnownSource).where(KnownSource.name == known_name).limit(1)
+            ).first()
+            if ks is not None:
+                l2_db_obj.known_id = ks.id
+
         session.add(l2_db_obj)
 
         # Now we can associate the L1 events with the L2 event.

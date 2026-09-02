@@ -14,10 +14,8 @@ __developers__ = "Shriharsh Tendulkar"
 __email__ = "shriharsh@physics.mcgill.ca"
 __status__ = "Epsilon"
 
-#from frb_common.events import L2Event, SimulateEvents
-from frb_L2_L3 import config_dir
-
 from chord_frb_sifter.actors.actor import Actor
+from chord_frb_sifter import config
 
 from . import rfi_filter_rules
 
@@ -85,7 +83,10 @@ class RFISifter(Actor):
 
             if event.rfi_grade_level2 < self.threshold:
                 # set event_category to RFI (=3)
-                event.is_rfi = True
+                print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
+                #event.is_rfi = True
+                # set event_category to RFI (=3)
+                event.set_rfi()
                 print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
 
             else:
@@ -117,8 +118,7 @@ class RFISifter(Actor):
         for i, filt in enumerate(filters):
             # check if this filter definition exists
             if hasattr(rfi_filter_rules, filt[0]):
-                filt[1].update({"config_dir": config_dir})
-
+                filt[1].update({"config_dir": config.config_dir})
                 try:
                     # test out the function
                     # func =getattr(rfi_filter_rules, filt[0])(filt[1])
@@ -195,36 +195,16 @@ class RFISifter(Actor):
 def filter_works(filter_function):
     """
     Tests that a filter minimally works without crashing.
-
-    This does not test the science. Only that the filter function takes
-    an L2_event and the arguments provided in the config file and returns
-    an L2_event without an error.
-    *** Whether the function does anything usefulis not checked.****
-
-    Parameters
-    ----------
-    filter_function : func
-    Function handle from L2_rfi_filter_rules
-    filter_arguments : str
-    kwargs for the filters.
     """
-    return True
-    
-    # event_maker = SimulateEvents()
-    # 
-    # events_in = event_maker.get_l3_events(number_of_events=5)
-    # 
-    # try:
-    #     for event in events_in:
-    #         event_out = filter_function.grade(event)
-    #     assert isinstance(event_out, L2Event)
-    #     print("Filter {} works.".format(filter_function.__name__))
-    #     # print "Filter %s works!"%filter_function.__name__
-    #     return True  # filter is good.
-    # except AssertionError:
-    #     print(("Filter {} doesn't work!".format(filter_function.__name__)))
-    #     return False
-
+    from chord_frb_sifter.event import simulate_l2_event
+    try:
+        filter_function.grade(simulate_l2_event())
+        print("Filter {} works.".format(filter_function.__name__))
+        return True
+    except Exception:
+        import traceback; traceback.print_exc()
+        print("Filter {} doesn't work!".format(filter_function.__name__))
+        return False
 
 # test
 if __name__ == "__main__":

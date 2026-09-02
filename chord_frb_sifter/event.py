@@ -9,6 +9,20 @@ list of events plus properties that belong to the group.
 
 """
 import numpy as np
+from chord_frb_sifter import config
+
+def simulate_l2_event():
+    """Returns a minimal L2Event for smoke-testing pipeline actors."""
+    fake_l1 = np.zeros(3, dtype=get_L1Event_dtype()).view(L1Event)
+    fake_l1['snr'] = [10.0, 8.0, 6.0]
+    fake_l1['dm'] = 100.0
+    fake_l1['tree_index'] = 2
+    fake_l1['beam_id'] = [0, 1, 2]
+    # snr_vs_dm needs nonzero values so RFI feature extraction doesn't get an empty array
+    fake_l1['snr_vs_dm'] = np.array([5.0, 6.0, 7.0, 8.0, 9.0, 9.5, 10.0, 9.5, 9.0,
+                                      8.0, 7.0, 6.0, 5.0, 4.5, 4.0, 3.5, 3.0])
+    return L2Event({'dm': 100.0, 'timestamp_utc': 0.0, 'beam_activity': 10,
+                    'dead_beams': [], 'l1_events': fake_l1})
 
 class AttribDict(dict):
     __setattr__ = dict.__setitem__
@@ -34,6 +48,37 @@ class EventGroup(AttribDict):
 
 class L1Event(AttribDict):
 
+    def get_dm_error(self):
+    
+        ## should load from config...
+        #nds = [1, 2, 4, 8, 16]
+        #nups = 1
+        #dm_coarse_graining_factor = [16, 8, 8, 8, 8]
+        #time_coarse_graining_factor = [16, 8, 8, 8, 8]
+        #tree_size = [ 32768, 32768, 32768, 32768, 16384 ]
+        #dt_sample = 0.00098304
+        #freq_lo_MHz = 400.0
+        #freq_hi_MHz = 800.0
+    
+        itree = self["tree_index"][0]
+        tree_dt = config.l1_config.dt_sample * config.l1_config.nds[itree] / config.l1_config.nups
+    
+        tree_max_dm = (
+                (config.l1_config.tree_size[itree] - 1)
+                * tree_dt
+                / (4.148806e3 * (1.0 / config.l1_config.freq_lo_MHz**2 - 1.0 / config.l1_config.freq_hi_MHz**2))
+                )
+        
+        return tree_max_dm * config.l1_config.dm_coarse_graining_factor[itree] / config.l1_config.tree_size[itree] / 2.0
+
+    def get_time_error(self):
+
+        itree = self["tree_index"][0]
+        tree_dt = config.l1_config.dt_sample * config.l1_config.nds[itree] / config.l1_config.nups
+
+        return tree_dt * config.l1_config.dm_coarse_graining_factor[itree] / 2.0
+
+    
     '''
     Creates a dict to initialize a database object,
     chord_frb_db.models.EventBeam
@@ -81,23 +126,33 @@ class L1Event(AttribDict):
         return db_args
 
 class L2Event(AttribDict):
+    def get_l1_events_array(self, key, dtype=None):
+        import numpy as np
+        return np.array([e[key] for e in self.l1_events], dtype=dtype)
+
     def is_rfi(self):
         return getattr(self, 'flag_rfi', False)
     def is_frb(self):
         return getattr(self, 'flag_frb', False)
-    def is_galactic(self):
-        return getattr(self, 'flag_galactic', False)
-    def is_ambiguous(self):
-        return getattr(self, 'flag_ambiguous', False)
+    def is_known_pulsar(self):
+        return getattr(self, 'flag_known_pulsar', False)
+    def is_repeating_frb(self):
+        return getattr(self, 'flag_repeating_frb', False)
+    def is_new_burst(self):
+        return getattr(self, 'flag_new_burst', False)
     def is_known_source(self):
-        return getattr(self, 'flag_known_source', False)
+        return self.is_known_pulsar() or self.is_repeating_frb()
 
+    def set_rfi(self):
+        self.flag_rfi = True
     def set_frb(self):
         self.flag_frb = True
-    def set_ambiguous(self):
-        self.flag_ambiguous = True
-    def set_galactic(self):
-        self.flag_galactic = True
+    def set_known_pulsar(self):
+        self.flag_known_pulsar = True
+    def set_repeating_frb(self):
+        self.flag_repeating_frb = True
+    def set_new_burst(self):
+        self.flag_new_burst = True
 
     '''
     Creates a dict to initialize a database object,
@@ -106,10 +161,10 @@ class L2Event(AttribDict):
     def database_payload(self):
         # dict shallow copy
         l2_db_args = { 'is_rfi': self.is_rfi(),
-                       'is_known_pulsar': False,
-                       'is_new_burst': False,
+                       'is_known_pulsar': self.is_known_pulsar(),
+                       'is_new_burst': self.is_new_burst(),
                        'is_frb': self.is_frb(),
-                       'is_repeating_frb': False,
+                       'is_repeating_frb': self.is_repeating_frb(),
                        'scattering': 0.,
                        'fluence': 0.,
         }
@@ -122,13 +177,12 @@ class L2Event(AttribDict):
             'dm_error': True,
             'ra': True,
             'dec': True,
-            'is_rfi': True,
             'is_frb': True,
             'pos_ra_deg': 'ra',
             'pos_error_semimajor_deg_68': 'ra_error',
             'pos_dec_deg': 'dec',
             'pos_error_semiminor_deg_68': 'dec_error',
-            'dm_gal_ne_2001_max': 'dm_ne2001',
+            'dm_gal_ne_2025_max': 'dm_ne2025',
             'dm_gal_ymw_2016_max': 'dm_ymw2016',
             'spectral_index': True,
             'pulse_width_ms': 'pulse_width',

@@ -1,0 +1,7 @@
+- max_coherent_snr
+- snr_weighted_level1_grade
+- snr_weighted_tree_index
+- beam_activity
+- coh_dm_activity
+- group_density
+- ew_extent

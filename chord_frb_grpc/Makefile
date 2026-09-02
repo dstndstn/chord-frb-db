@@ -10,6 +10,9 @@ all: $(HELLO)
 SIFTER := frb_sifter_pb2.py frb_sifter_pb2.pyi frb_sifter_pb2_grpc.py
 all: $(SIFTER)
 
+SIFTER_CHIME := frb_sifter_chime_pb2.py frb_sifter_chime_pb2.pyi frb_sifter_chime_pb2_grpc.py
+all: $(SIFTER_CHIME)
+
 SEARCH := frb_search_pb2.py frb_search_pb2.pyi frb_search_pb2_grpc.py
 all: $(SEARCH)
 

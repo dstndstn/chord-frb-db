@@ -293,7 +293,6 @@ def get_l1_features(l1_events):
         snr = [e.snr for e in l1_events]
         snr_sort = np.argsort(snr)
         imax = snr_sort[-1]
-
         ret["max_coherent_snr"] = snr[imax]
         if num_coherent_beams > 1:
             isecond = snr_sort[-2]
