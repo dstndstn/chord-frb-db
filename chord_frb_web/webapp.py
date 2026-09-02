@@ -261,11 +261,42 @@ def intensity_file_list(event_id):
     event = db.session.execute(query).scalar_one()
     print('event:', event)
 
-    fields = ['filename', 'status', 'error_message']
+    fields = ['filename', 'status', 'error_message', 'view link']
     return render_template('intensity_file_list.html', event_id=event_id,
                            event=event, intensity_files=ifiles, fields=fields)
 
+@app.route('/intensity-file-view/<int:event_id>/<path:filename>')
+def intensity_file_view(event_id, filename):
+    query = sa.select(IntensityFile).filter_by(filename=filename)
+    ifile = db.session.execute(query).scalar_one()
+    print('ifile:', ifile)
+    print('app.config is', app.config, type(app.config))
+    path = os.path.join(app.config['PIRATE_INTENSITY_DIR'], ifile.filename)
+
+    import pylab as plt
+    import tempfile
     
+    import asdf
+    with asdf.open(path) as af:
+
+        so = af['scales_offsets']
+        data = af['data']
+        # load?
+        data = data[:,:]
+
+        with tempfile.NamedTemporaryFile(suffix='.png') as tf:
+            plt.clf()
+            plt.imshow(data, interpolation='nearest', origin='lower')
+            plt.colorbar()
+            plt.savefig(tf.name)
+            plotdata = open(tf.name, 'rb')
+
+            resp = make_response(plotdata)
+            resp.headers['Content-Type'] = 'image/png'
+            return resp
+    #return str(af.info())
+    #return str(path)
+
 @app.route('/')
 def event_list(): #(name=None):
     query = sa.select(Event).order_by(Event.event_id)#.desc())
