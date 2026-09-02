@@ -39,25 +39,27 @@ class BrightPulsarSifter(Actor):
             lon=self.tele.origin_itrs_lon_deg
             )
 
-    def _perform_action(self, event):
-  
-        dm = event['dm']
-        t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
+    def __str__(self):
+        return 'BrightPulsarSifter'
 
-        lst = Time(t, scale='utc', location=self.loc).sidereal_time('apparent').hour
+    def _perform_action(self, event_group):
 
-        for pulsar, params in self.bright_pulsars.items():
-            ha = lst - params['ra']
-            ha = (ha + 12) % 24 - 12 # wrap HA
+        for event in event_group.events:
+            dm = event['dm']
+            t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
+            lst = Time(t, scale='utc', location=self.loc).sidereal_time('apparent').hour
 
-            if params['ha_window'][0] < ha < params['ha_window'][1]:
-                if abs(dm - params['dm']) < params['dm_tol']:
-                    event['is_bright_pulsar'] = True
-                    event['bright_pulsar_name'] = pulsar
-                    event['known_source_name'] = pulsar
-                    if not event.is_rfi():
-                        event.set_known_pulsar()
-                    return [event]
+            event['is_bright_pulsar'] = False
+            for pulsar, params in self.bright_pulsars.items():
+                ha = lst - params['ra']
+                ha = (ha + 12) % 24 - 12 # wrap HA
 
-        event['is_bright_pulsar'] = False
-        return [event]
+                if params['ha_window'][0] < ha < params['ha_window'][1]:
+                    if abs(dm - params['dm']) < params['dm_tol']:
+                        event['is_bright_pulsar'] = True
+                        event['bright_pulsar_name'] = pulsar
+                        event['known_source_name'] = pulsar
+                        if not event.is_rfi():
+                            event.set_known_pulsar()
+                        break
+        return [event_group]

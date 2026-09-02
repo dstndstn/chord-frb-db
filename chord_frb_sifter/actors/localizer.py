@@ -53,52 +53,53 @@ class Localizer(Actor):
         self.tele = ChordTelescope(config.chord_config.telescope)
         self.central_freq_mhz = central_freq_mhz
 
-    def _perform_action(self, event):
-        l1 = event["l1_events"]
-        x    = l1["beam_grid_x"].astype(float)
-        y    = l1["beam_grid_y"].astype(float)
-        snrs = l1["snr"].astype(float)
+    def __str__(self):
+        return 'Localizer'
 
-        # TODO: read central_freq_mhz per-event from l1 once the field exists
-        sigma_x, sigma_y = beam_sigmas(self.central_freq_mhz)
+    def _perform_action(self, event_group):
+        for event in event_group.events:
+            x = event.get_l1_events_array('beam_grid_x', dtype=float)
+            y = event.get_l1_events_array('beam_grid_y', dtype=float)
+            snrs = event.get_l1_events_array('snr', dtype=float)
 
-        if len(snrs) == 1:
-            x_out, y_out = x[0], y[0]
-            x_err, y_err = sigma_x, sigma_y
-        else:
-            x_out, y_out, x_err, y_err = fit_2dgauss_analytical_jac(
-                x, y, snrs, sigma_x, sigma_y
-            )
-            # Rank-deficient Jacobian (one-sided cluster at FOV edge): fall
-            # back to the peak-SNR beam centre with beam sigma rather than
-            # propagating NaN error bars downstream.
-            if np.isnan(x_err) or np.isnan(y_err):
-                peak_i = np.argmax(snrs)
-                x_out, y_out = x[peak_i], y[peak_i]
+            # TODO: read central_freq_mhz per-event from l1 once the field exists
+            sigma_x, sigma_y = beam_sigmas(self.central_freq_mhz)
+
+            if len(snrs) == 1:
+                x_out, y_out = x[0], y[0]
                 x_err, y_err = sigma_x, sigma_y
+            else:
+                x_out, y_out, x_err, y_err = fit_2dgauss_analytical_jac(
+                    x, y, snrs, sigma_x, sigma_y
+                )
+                # Rank-deficient Jacobian (one-sided cluster at FOV edge): fall
+                # back to the peak-SNR beam centre with beam sigma rather than
+                # propagating NaN error bars downstream.
+                if np.isnan(x_err) or np.isnan(y_err):
+                    peak_i = np.argmax(snrs)
+                    x_out, y_out = x[peak_i], y[peak_i]
+                    x_err, y_err = sigma_x, sigma_y
 
-        # Unit-sphere grid coords -> topocentric -> ITRS -> (RA, Dec)
-        z_out = np.sqrt(max(0.0, 1.0 - x_out**2 - y_out**2))
-        topo  = self.tele.grid_to_topocentric(x_out, y_out, z=z_out)
-        itrs  = self.tele.topocentric_to_itrs(topo)
-        t     = Time(event["timestamp_utc"] / 1e6, format="unix", scale="utc")
-        ra, dec = self.tele.itrs_to_radec(itrs, t)
+            # Unit-sphere grid coords -> topocentric -> ITRS -> (RA, Dec)
+            z_out = np.sqrt(max(0.0, 1.0 - x_out**2 - y_out**2))
+            topo  = self.tele.grid_to_topocentric(x_out, y_out, z=z_out)
+            itrs  = self.tele.topocentric_to_itrs(topo)
+            t     = Time(event["timestamp_utc"] / 1e6, format="unix", scale="utc")
+            ra, dec = self.tele.itrs_to_radec(itrs, t)
 
-        event["ra"]      = ra
-        event["dec"]     = dec
-        # Small-angle approximation: grid errors (radians) -> sky errors (degrees)
-        event["ra_err"]  = np.rad2deg(x_err)
-        event["dec_err"] = np.rad2deg(y_err)
+            event.ra = ra
+            event.dec = dec
+            # Small-angle approximation: grid errors (radians) -> sky errors (degrees)
+            event.ra_err  = np.rad2deg(x_err)
+            event.dec_err = np.rad2deg(y_err)
 
-        return [event]
-
+        return [event_group]
 
 def gauss2d(xy, A, x0, y0, sigma_x, sigma_y):
     return A * np.exp(-(
         ((xy[0] - x0)**2) / (2 * sigma_x**2) +
         ((xy[1] - y0)**2) / (2 * sigma_y**2)
     ))
-
 
 def residuals_gauss2d_analytical_width(p0, xy, sigma_x, sigma_y, snr):
     x0, y0 = p0

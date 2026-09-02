@@ -71,8 +71,14 @@ class Event(Base):
     known_id:       Mapped[Optional[int]] = mapped_column(ForeignKey('known_source.id'))
     known:     Mapped['KnownSource'] = relationship(back_populates='events')
 
+    intensity_files:     Mapped[List['IntensityFile']] = relationship(back_populates='event')
+
     #def __repr__(self) -> str:
     #    return f"User(id={self.id!r}, name={self.name!r}, fullname={self.fullname!r})"
+
+    @property
+    def n_intensity_files(self):
+        return len(self.intensity_files)
 
 # Individual-beam measurements for a grouped multi-beam event
 # Aka an "L1 event"
@@ -116,6 +122,23 @@ class EventBeam(Base):
     event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
     event:     Mapped['Event'] = relationship(back_populates='beams')
 
+class IntensityFile(Base):
+    __tablename__ = 'intensity_file'
+    filename:    Mapped[str] = mapped_column(String(1024), primary_key=True)
+    succeeded:   Mapped[bool] = mapped_column(default=False, server_default='false')
+    failed:      Mapped[bool] = mapped_column(default=False, server_default='false')
+    error_message: Mapped[Optional[str]] = mapped_column(String(1024))
+
+    event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("event.event_id"))
+    event:     Mapped['Event'] = relationship(back_populates='intensity_files')
+
+    def status_color(self):
+        if self.succeeded:
+            return 'green'
+        if self.failed:
+            return 'red'
+        return 'yellow'
+    
 class KnownSource(Base):
     __tablename__ = 'known_source'
     id:          Mapped[int] = mapped_column(primary_key=True)

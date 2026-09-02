@@ -15,6 +15,9 @@ class EventIdStamper(Actor):
         self.db_thread = Thread(target=EventIdStamper.run_db, args=(self, database_engine), daemon=True)
         self.db_thread.start()
 
+    def __str__(self):
+        return 'EventIdStamper'
+
     def run_db(self, database_engine):
         print('database_engine:', database_engine)
         if database_engine.is_sqlite:
@@ -29,12 +32,14 @@ class EventIdStamper(Actor):
                     eid = get_next_event_id(session)
                     self.event_id_queue.put(eid)
 
-    def _perform_action(self, event):
-        l1 = event['l1_events']
-        for i in range(len(l1)):
+    def _perform_action(self, event_group):
+        for event in event_group.events:
+            # Assume that we receive L2Event objects; assign IDs to the L2Event as well as all of its
+            # L1Events.
+            for l1 in event.l1_events:
+                eid = self.event_id_queue.get()
+                l1.id = eid
             eid = self.event_id_queue.get()
-            l1['id'][i] = eid
-        eid = self.event_id_queue.get()
-        print('Stamped L2 event id', eid)
-        event.event_id = eid
-        return [event]
+            print('Stamped L2 event id', eid)
+            event.event_id = eid
+        return [event_group]

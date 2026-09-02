@@ -14,12 +14,10 @@ __developers__ = "Shriharsh Tendulkar"
 __email__ = "shriharsh@physics.mcgill.ca"
 __status__ = "Epsilon"
 
+from chord_frb_sifter.actors.actor import Actor
 from chord_frb_sifter import config
 
-from chord_frb_sifter.actors.actor import Actor
-
 from . import rfi_filter_rules
-
 
 class RFISifter(Actor):
     """
@@ -67,8 +65,10 @@ class RFISifter(Actor):
         self.rfi_filter_argstrs = []
         self.load_filters(filters)
 
+    def __str__(self):
+        return 'RFISifter'
 
-    def _perform_action(self, event):
+    def _perform_action(self, event_group):
         """ Performs L2 RFI Sifting in science mode.
 
         Parameters are same as perform_action()
@@ -78,22 +78,22 @@ class RFISifter(Actor):
         perform_action
 
         """
-        self.set_L2_grades(event)
+        for event in event_group.events:
+            self.set_L2_grades(event)
 
-        if event.rfi_grade_level2 < self.threshold:
+            if event.rfi_grade_level2 < self.threshold:
+                # set event_category to RFI (=3)
+                print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
+                #event.is_rfi = True
+                # set event_category to RFI (=3)
+                event.set_rfi()
+                print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
 
-            # set event_category to RFI (=3)
-            event.set_rfi()
-
-            print("RFI Sifter: Event at time %s -> RFI" % str(event.timestamp_utc))
-
-            return [event]
-
-        else:
-
-            print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
-
-            return [event]
+            else:
+                print("RFI Sifter: Event at time %s -> Astro" % str(event.timestamp_utc))
+                # For now if its not RFI say its unknown (KSS can change later)
+                event.is_rfi = False
+        return [event_group]
 
     def load_filters(self, filters):
         """ Initializes the filters defined in the configuration file.
@@ -123,7 +123,7 @@ class RFISifter(Actor):
                     # test out the function
                     # func =getattr(rfi_filter_rules, filt[0])(filt[1])
                     func = getattr(rfi_filter_rules, filt[0])(filt[1])
-
+                
                     if filter_works(func):
                         self.filters.append(getattr(rfi_filter_rules, filt[0])(filt[1]))
                         self.rfi_filter_names.append(filt[0])
@@ -135,7 +135,7 @@ class RFISifter(Actor):
                             + "is not executing correctly. "
                             + "Check filter definition and config!"
                         )
-
+                
                 except Exception as e:
                     import traceback; print(traceback.format_exc())
                     print(e)
@@ -205,7 +205,6 @@ def filter_works(filter_function):
         import traceback; traceback.print_exc()
         print("Filter {} doesn't work!".format(filter_function.__name__))
         return False
-
 
 # test
 if __name__ == "__main__":

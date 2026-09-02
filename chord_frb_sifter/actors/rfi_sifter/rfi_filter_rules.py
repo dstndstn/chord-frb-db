@@ -464,19 +464,21 @@ class High_SNR_Override(object):
 
         l1_events = event.l1_events
         num_beams = len(l1_events)
-        num_incoherent_beams = np.count_nonzero(l1_events["is_incoherent"])
-        filt = np.where(l1_events["is_incoherent"] == False)
+        inco = [e.is_incoherent for e in l1_events]
+        num_incoherent_beams = sum(inco)
+        filt = np.where(np.array(inco) == False)
 
+        snr = np.array([e.snr for e in l1_events])
         if num_beams == num_incoherent_beams:
             if self.only_coherent:
                 return event  # without modification
             else:
-                max_snr = np.max(l1_events["snr"])
+                max_snr = np.max(snr)
         elif num_beams > num_incoherent_beams:
             if self.only_coherent:
-                max_snr = np.max(l1_events["snr"][filt])
+                max_snr = np.max(snr[filt])
             else:
-                max_snr = np.max(l1_events["snr"])
+                max_snr = np.max(snr)
         else:  # this should NEVER happen
             print(
                 "For num_beams < num_incoherent_beams for event! This should never happen."
