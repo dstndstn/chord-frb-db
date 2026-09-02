@@ -3,3 +3,4 @@ import os
 class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('CHORD_FRB_DB_URL')
     TEMPLATES_AUTO_RELOAD = True
+    PIRATE_INTENSITY_DIR = '/mnt/cs00/data/dstn/pirate-intensity/'

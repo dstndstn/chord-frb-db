@@ -2,6 +2,7 @@ import time
 from chord_frb_grpc import frb_sifter_pb2_grpc
 from chord_frb_grpc.frb_sifter_pb2 import ConfigReply, FrbEventsReply
 import queue
+from chord_frb_sifter.event import L1Event, EventGroup
 from chord_frb_sifter.pipeline import setup, simple_create_pipeline
 from chord_frb_sifter.pipeline import simple_process_events
 
@@ -15,10 +16,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from chord_frb_db.models import PirateConfig, BeamSNR
 
-
 '''
 This script opens a gRPC server socket listening for connections from Pirate.
 It loads the pipeline and sends any events it receives through the pipeline.
+It interacts with a database and sends intensity callback requests to Pirate.
 '''
 
 class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
@@ -33,6 +34,9 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         #self.dedisp_config = None
         #self.grouper_config = None
 
+        self.subscribe_files_threads = []
+        self.file_update_queue = queue.SimpleQueue()
+        
         # beamset (int) -> arrays of (id, x, y)
         self.beamset_meta = {}
 
@@ -42,8 +46,31 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
         # beam_id to (beam_x, beam_y)
         self.beam_id_to_xy = {}
 
+        # beam_id to beamset
+        self.beam_id_to_beamset = {}
+        
         # is a gRPC peer address the fake x-engine??
         self.peer_is_fake = {}
+
+    def fpga_to_utc_seconds(self, fpga):
+        t0 = self.xengine_config['unix_ns_at_seq_0']
+        dt = self.xengine_config['dt_ns_per_seq']
+        utc = (t0 + dt * fpga) * 1e-9
+        return utc
+
+    def nanosec_per_fpga_seq(self):
+        dt = self.xengine_config['dt_ns_per_seq']
+        return dt
+
+    # in MHz
+    def get_freq_range(self):
+        edges = self.xengine_config['zone_freq_edges']
+        return (edges[0], edges[-1])
+
+    # Called by beam_buffer
+    def beamset_to_beam_ids(self, beamset):
+        beam_ids,_,_ = self.beamset_meta[beamset]
+        return beam_ids
 
     def print_yaml(self, y):
         # just indent...
@@ -119,24 +146,50 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
                         return False
                 self.beam_id_to_xy[beam_id] = new_val
 
+                self.beam_id_to_beamset[beam_id] = beamset
+
             # delta-RA,delta-Dec of beam positions relative to boresight.
 
                 
         if not is_fake:
             import grpc
             from chord_frb_grpc.frb_search_pb2_grpc import FrbSearchStub
-            from chord_frb_grpc.frb_search_pb2 import GetStatusRequest
+            from chord_frb_grpc.frb_search_pb2 import GetStatusRequest, SubscribeFilesRequest
             # Check that we can call back to Pirate...
             print('Pirate RPC address:', pirate_rpc)
-            # Open connection...
-            ch1 = grpc.insecure_channel(pirate_rpc)
-            pirate = FrbSearchStub(ch1)
-            # Make a pirate Status call
-            req = GetStatusRequest()
-            resp = pirate.GetStatus(req)
-            print('Got pirate RPC response:', resp)
-            self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
-
+            # testing...
+            if len(pirate_rpc):
+                # Open connection...
+                ch1 = grpc.insecure_channel(pirate_rpc)
+                pirate = FrbSearchStub(ch1)
+                # Make a pirate Status call
+                req = GetStatusRequest(protocol_version=2)
+                print('Pirate Status RPC request:', req)
+                resp = pirate.GetStatus(req)
+                print('Got pirate RPC response:', resp)
+                self.beamset_pirate_rpc[beamset] = (pirate_rpc, pirate)
+                # Subscribe to file updates!
+                req = SubscribeFilesRequest(protocol_version=2,
+                                            subscribe_streams=False)
+                print('Subscribing to file updates:', req)
+                resp = pirate.SubscribeFiles(req)
+                print('Subscribed to file updates:', resp)
+                for val in resp:
+                    print('First subscribe-files response:', val)
+                    # check that it's a ReadySentinal
+                    ready = val.ready
+                    print('Ready:', ready)
+                    break
+                print('Response is a', type(resp))
+                print('Response is', resp)
+                # Create a thread to continue reading updates from this pirate?
+                import threading
+                t = threading.Thread(target=file_update_rpc_reader,
+                                     args=(resp, self.file_update_queue, beamset),
+                                     name='file-update-handler-beamset-%i' % beamset)
+                self.subscribe_files_threads.append(t)
+                t.start()
+                
         # save parsed and yaml xengine config
         self.xengine_config = xengine
         self.xengine_config_yaml = xengine_yaml
@@ -167,31 +220,34 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         is_fake = self.peer_is_fake.get(context.peer())
 
-        if len(request.events):
-            header = dict()
-            keys = ['chunk_fpga_start']
-            for key in keys:
-                header[key] = getattr(request, key)
+        # Convert grpc FrbEvent objects into simple dicts.
+        event_list = []
+        for e in request.events:
+            # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
+            event = L1Event(is_incoherent=False,
+                            is_fake=is_fake)
+            for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
+                        'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz',
+                        'tree_index']:
+                event[key] = getattr(e, key)
+            # HACK
+            event.dm_error = 0.1
 
-            # Convert grpc FrbEvent objects into simple dicts.
-            event_list = []
-            for e in request.events:
-                # FIXME -- we should use introspection to get the keys defined in frb_sifter.proto....
-                simple_event = dict()
-                for key in ['beam_id', 'fpga_timestamp', 'dm', 'snr', 'rfi_prob',
-                            'width_ms', 'subband_freq_lo_MHz', 'subband_freq_hi_MHz']:
-                    simple_event[key] = getattr(e, key)
+            # yuck
+            # CHIME/FRB's rfi_grade_level2
+            # values are 0 to 10, with RFI:0 and Astrophysical:10.
+            event['rfi_grade_level1'] = 10. * (1. - event['rfi_prob'])
+            print('Created L1Event:', event)
+            event_list.append(event)
 
-                simple_event['is_fake'] = is_fake
-                # yuck
-                # CHIME/FRB's rfi_grade_level2
-                # values are 0 to 10, with RFI:0 and Astrophysical:10.
-                simple_event['rfi_grade_level1'] = 10. * (1. - simple_event['rfi_prob'])
+        # Send event list even if empty - BeamBuffer needs to know it has heard from all beamsets.
+        event_group = EventGroup(is_fake=is_fake,
+                                 chunk_fpga_start=request.chunk_fpga_start,
+                                 beamset=request.beam_set_id,
+                                 events=event_list)
+        self.event_queue.put(event_group)
 
-                event_list.append(simple_event)
-            self.event_queue.put((event_list, header))
-
-        if len(request.coarsegrain_snr):
+        if not is_fake and len(request.coarsegrain_snr):
             self.beam_snr_queue.put(dict(beamset=request.beam_set_id,
                                          fpga_start=request.chunk_fpga_start,
                                          fpga_end=request.chunk_fpga_end,
@@ -200,6 +256,79 @@ class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):
 
         return FrbEventsReply(ok=ok, message=msg)
 
+# One thread per pirate, just to receive the streaming file-update RPCs.
+def file_update_rpc_reader(stream, file_update_queue, beamset):
+    print('file_update_handler starting for beamset', beamset)
+    try:
+        print('stream:', stream)
+        for val in stream:
+            print('Got file update for beamset', beamset)
+            print('file update:', val)
+            notif = val.notification
+            print('notification:', notif)
+            err = notif.error_message
+            if err:
+                print('filename: %s failed: error message: %s' % (notif.filename, err))
+            else:
+                print('filename %s written sucessfully' % notif.filename)
+            # eg, filename event-00003959/frame_b8_t116.asdf written sucessfully
+            file_update_queue.put((None, notif.filename, notif.error_message))
+    except Exception as e:
+        print('Exception in thread receiving file-writing updated from pirate (beamset %i): %s' % (beamset, e))
+        print(e)
+        import traceback
+        traceback.print_exc(e)
+        # FIXME -- fail more loudly?
+        raise
+
+def file_update_db_handler(file_update_queue, database):
+    import sqlalchemy as sa
+    from sqlalchemy.orm import Session
+    from chord_frb_db.models import IntensityFile
+
+    with Session(database) as session:
+        while True:
+            fup = file_update_queue.get()
+            (event_id, filename, error_message) = fup
+            print('Sending file update to db: event %s, filename %s, err %s' %
+                  (event_id, filename, error_message))
+
+            # We either get
+            # (event_id, filename, None) --> pirate told us it's going to write this file
+            # or
+            # (None, filename, error_message) --> pirate updated us about this file
+            #
+            
+            # create if it doesn't exist, update its status if it does
+            ifile = session.execute(sa.select(IntensityFile).where(
+                IntensityFile.filename==filename)).scalar_one_or_none()
+            print('IntensityFile object with that filename:', ifile)
+            if ifile is not None:
+                print('Got IntensityFile:', ifile)
+                if event_id is not None and event_id != ifile.event_id:
+                    ifile.event_id = event_id
+                if error_message is not None:
+                    ok = (len(error_message) == 0)
+                    ifile.succeeded = ok
+                    ifile.failed = not(ok)
+                    ifile.error_message = error_message
+                print('Updated IntensityFile status')
+            else:
+                kwargs = {}
+                if event_id is not None:
+                    kwargs.update(event_id=event_id)
+                if error_message is not None:
+                    ok = (len(error_message) == 0)
+                    kwargs.update(succeeded=ok,
+                                  failed=not(ok),
+                                  error_message=error_message)
+                ifile = IntensityFile(filename=filename,
+                                      **kwargs)
+                print('Adding IntensityFile to db')
+                session.add(ifile)
+            session.flush()
+            session.commit()
+            
 def serve(sifter, port=10000, max_threads=10):
     import grpc
     from concurrent import futures
@@ -215,57 +344,52 @@ def serve(sifter, port=10000, max_threads=10):
     return server
 
 def event_handler(sifter, event_queue, pipeline):
-    # fpga to utc conversions
-    t0 = None
-    dt = None
     # beam id to xy position
     beam_id_to_xy = sifter.beam_id_to_xy
     
     while True:
-        events,header = event_queue.get()
-        print('event_handler: got', len(events), 'events')
-        good_events = []
-        later_events = []
-        for e in events:
+        event_group = event_queue.get()
+        if event_group.is_fake:
+            if len(event_group.events):
+                print('Ignoring', len(event_group.events), 'fake events')
+            continue
+        chunk_utc = sifter.fpga_to_utc_seconds(event_group.chunk_fpga_start)
+        event_group.chunk_utc = chunk_utc
 
-            if e['is_fake']:
-                print('Fake event: ignoring!', e)
-                continue
-
+        later = False
+        for e in event_group.events:
             # add beam metadata
 
             # ... if beam metadata is not yet known (the config
             # sending seems to actually get sent in a separate thread
-            # from the event sending....), re-queue this event for
+            # from the event sending....), re-queue this event_group for
             # processing later.
             beam_id = e['beam_id']
             if not beam_id in beam_id_to_xy:
-                print('Nothing is known about beam %i yet... saving this event for reprocessing'
+                print('Nothing is known about beam %i yet... saving this event group for reprocessing'
                       % beam_id)
-                later_events.append(e)
-                continue
-            
+                later = True
+                break
+
             x,y = beam_id_to_xy[e['beam_id']]
             e['beam_grid_x'] = x
             e['beam_grid_y'] = y
 
-            # Add values from the chunk-header
+            # Add values from the event-group
             for key in ['chunk_fpga_start']:
-                e[key] = header[key]
+                e[key] = event_group[key]
             # convert FPGA to UTC seconds...
-            if t0 is None:
-                t0 = sifter.xengine_config['unix_ns_at_seq_0']
-                dt = sifter.xengine_config['dt_ns_per_seq']
-            e['chunk_utc'] = (t0 + dt * header['chunk_fpga_start']) * 1e-9
-            e['timestamp_utc'] = (t0 + dt * e['fpga_timestamp']) * 1e-9
-            good_events.append(e)
-        if len(good_events):
-            simple_process_events(pipeline, good_events)
-        if len(later_events):
+            e['chunk_utc'] = chunk_utc
+            e['timestamp_utc'] = sifter.fpga_to_utc_seconds(e.fpga_timestamp)
+
+        if later:
             if event_queue.empty():
                 time.sleep(1.)
-            print('Putting %i events back on the queue for later processing' % (len(later_events)))
-            event_queue.put((later_events, header))
+            print('Putting event group back on the queue for later processing')
+            event_queue.put(event_group)
+            continue
+
+        simple_process_events(pipeline, event_group)
 
 def beam_snr_handler(sifter, beam_snr_queue, database):
     known_beamsets = set()
@@ -382,7 +506,7 @@ def main():
     # Load pipeline config file
     setup()
 
-    pipeline = simple_create_pipeline(database_engine)
+    pipeline = simple_create_pipeline(database_engine, sifter=sifter)
 
     event_thread = threading.Thread(target=event_handler,
                                     args=(sifter, sifter.event_queue, pipeline),
@@ -394,8 +518,34 @@ def main():
                                        name='beam-snr-handler')
     beam_snr_thread.start()
 
+    file_update_db_thread = threading.Thread(target=file_update_db_handler,
+                                       args=(sifter.file_update_queue, database_engine),
+                                       name='file-update-db-handler')
+    file_update_db_thread.start()
+
+    if False:
+        fake_xengine_conf = {'version': 2, 'zone_nfreq': [640], 'zone_freq_edges': [400, 800], 'beamset': 0, 'beam_ids': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], 'beam_positions_x': [-0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999, -0.1, -0.03333333333333334, 0.033333333333333326, 0.09999999999999999], 'beam_positions_y': [-0.1, -0.1, -0.1, -0.1, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, -0.03333333333333334, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.033333333333333326, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999, 0.09999999999999999], 'unix_ns_at_seq_0': 1786482526471023104, 'dt_ns_per_seq': 5120, 'seq_per_frb_time_sample': 195, 'tel_origin_itrs_lat_deg': 49.32075144444, 'tel_origin_itrs_lon_deg': -119.62081125, 'tel_grid_x_axis': [0.9999743423983594, -3.7539331442772e-05, -0.007163318767675494], 'tel_grid_y_axis': [6.540338773921e-05, 0.9999924332203488, 0.003889630373557614], 'tel_dish_elev_axis': [0.9999999983813239, -5.6897733584327e-05, 0], 'tel_dish_vert_axis': [0, 0, 1], 'tel_dish_coelev_deg': 0, 'tel_dish_separation_x_m': 6.300156854906823, 'tel_dish_separation_y_m': 8.500057809796308, 'noise_variance': [1]}
+        xe_yaml = yaml.dump(fake_xengine_conf)
+        sifter.check_configs(None, xe_yaml, 'x: 4', '', '', '')
+                         
+        g = EventGroup(**{'is_fake': False, 'chunk_fpga_start': 5890560, 'beamset': 0,
+                          'events': [], 'chunk_utc': 1786482556.6306903})
+        sifter.event_queue.put(g)
+
+        g = EventGroup(**{'is_fake': False, 'chunk_fpga_start': 5940480, 'beamset': 0,
+                          'events': [
+                              L1Event(**{'beam_id': 4, 'fpga_timestamp': 5953740, 'dm': 1.437467336654663, 'snr': 29.343143463134766, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'beam_grid_x': -0.1, 'beam_grid_y': -0.03333333333333334, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482556.9541721, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1}),
+                              L1Event(**{'beam_id': 8, 'fpga_timestamp': 5989620, 'dm': 25.25835418701172, 'snr': 25.013864517211914, 'rfi_prob': 0.0, 'width_ms': 0.9983999729156494, 'subband_freq_lo_MHz': 400.0, 'subband_freq_hi_MHz': 800.0, 'is_fake': False, 'rfi_grade_level1': 10.0, 'beam_grid_x': -0.1, 'beam_grid_y': 0.033333333333333326, 'chunk_fpga_start': 5940480, 'chunk_utc': 1786482556.8862808, 'timestamp_utc': 1786482557.1378777, 'is_incoherent': False, 'tree_index': 0, 'dm_error': 0.1}),
+                          ], 'chunk_utc': 1786482556.8862808})
+        sifter.event_queue.put(g)
+
+        import time
+        time.sleep(15)
+        return
+
     server = serve(sifter)
     server.wait_for_termination()
+
 
 if __name__ == '__main__':
     import logging

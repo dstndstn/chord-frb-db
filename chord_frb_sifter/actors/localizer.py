@@ -23,54 +23,53 @@ class Localizer(Actor):
     """
 
     def __init__(self, **kwargs):
-
         self.bm = cfbm.current_model_class()
 
+    def __str__(self):
+        return 'Localizer'
 
-    def _perform_action(self, event):
+    def _perform_action(self, event_group):
         """
         Perform the localization action on the given event.
         """
 
+        for event in event_group.events:
+            beams = []
+            snrs = []
+            for e in event.l1_events:
+                beams.append(e.beam_id)
+                snrs.append(e.snr)
+            beams = np.array(beams)
+            snrs = np.array(snrs)
 
-        # fix this after making L1Events recarray?
-        beams = []
-        snrs = []
-        for e in event["l1_events"]:
-            beams.append(e["beam_id"])
-            snrs.append(e["snr"])
-        beams = np.array(beams)
-        snrs = np.array(snrs)
+            # get beam positions from the beam model. If calced earlier and attached
+            # to L2 header can use that instead.
+            step1 = self.bm.get_beam_positions(beams,freqs=self.bm.clamp_freq)[:,0,:].T
+            x,y = self.bm.get_cartesian_from_position(*step1)
 
-        # get beam positions from the beam model. If calced earlier and attached
-        # to L2 header can use that instead.
-        step1 = self.bm.get_beam_positions(beams,freqs=self.bm.clamp_freq)[:,0,:].T
-        x,y = self.bm.get_cartesian_from_position(*step1)
+            central_freq = 600.0 # 600.0 MHz for CHIME, should be 900.0 for CHORD
 
-        central_freq = 600.0 # 600.0 MHz for CHIME, should be 900.0 for CHORD
+            x_out, y_out, x_err, y_err = fit_2dgauss_simplified(x,y,snrs,central_freq)
 
-        x_out, y_out, x_err, y_err = fit_2dgauss_simplified(x,y,snrs,central_freq)
+            # For CHORD will translate directly from unit sphere coords to equat.
+            pos = self.bm.get_position_from_cartesian(x_out, y_out)
+            #t = np.datetime64(int(event["timestamp_utc"]),"us")
 
-        # For CHORD will translate directly from unit sphere coords to equat.
-        pos = self.bm.get_position_from_cartesian(x_out, y_out)
-        #t = np.datetime64(int(event["timestamp_utc"]),"us")
+            # ephem needs time to be a datetime object (and not a np.datetime64)
+            t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
+            ra, dec = self.bm.get_equatorial_from_position(pos[0],pos[1],t)
 
-        # ephem needs time to be a datetime object (and not a np.datetime64)
-        t = datetime.utcfromtimestamp(event["timestamp_utc"] / 1e6)
-        ra, dec = self.bm.get_equatorial_from_position(pos[0],pos[1],t)
+            # Setting these to what they are called in the DB schema.
+            event.ra = ra
+            event.dec = dec
 
-        # Setting these to what they are called in the DB schema.
-        event["ra"] = ra
-        event["dec"] = dec
+            # Estimate errors in RA/Dec from errors in x/y, assuming small angle approx.
+            # Should be reasonable if near meridian and errors are small.
+            event.ra_err = np.rad2deg(x_err)
+            event.dec_err = np.rad2deg(y_err)
+            print(ra,dec,x_err,y_err)
 
-        # Estimate errors in RA/Dec from errors in x/y, assuming small angle approx.
-        # Should be reasonable if near meridian and errors are small.
-        event["ra_err"] = np.rad2deg(x_err)
-        event["dec_err"] = np.rad2deg(y_err)
-        print(ra,dec,x_err,y_err)
-
-        return [event]
-        
+        return [event_group]
 
 def gauss2d(xy,A,x0,y0,sigma_x,sigma_y):
     return A * np.exp(-(((xy[0] - x0)**2) / (2 * sigma_x**2) + ((xy[1] - y0)**2) / (2 * sigma_y**2)))

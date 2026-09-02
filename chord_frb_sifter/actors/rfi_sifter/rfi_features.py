@@ -157,7 +157,7 @@ def features_to_vector(features_vector, label_list):
     return ret
 
 
-def event_to_features(event, event_no=None, return_y=False):
+def event_to_features(event, return_y=False):
     """
     This function generates a vector of features from an L2 event object.
     Not all the features are used by the classifier. 
@@ -168,10 +168,6 @@ def event_to_features(event, event_no=None, return_y=False):
     event : L2Event object
     This can either come from the pipeline or 
     from a pickled file (for offline classification)
-
-    event_no : int or None
-    If not None, the returned feature vector has this as its event number.
-    Else the event number field is zero.
 
     return_y : bool
     If True, returns the existing classification based on the L2 grade.
@@ -187,19 +183,12 @@ def event_to_features(event, event_no=None, return_y=False):
     """
     ret = np.zeros((1,), dtype=FULL_FEATURE_DTYPE)
 
-    if hasattr(event, "event_no"):
-        ret["event_no"] = event.event_no
-    if event_no is not None:
-        # override the event number provided by the user
-        ret["event_no"] = event_no
+    if hasattr(event, "event_id"):
+        ret["event_no"] = event.event_id
 
     ret["dm"] = event.dm
     ret["time"] = event.timestamp_utc
-
-    num_dead_beams = len(event.dead_beams) if hasattr(event,"dead_beams") else len(event.dead_beam_nos)
-    num_active_beams = 1021 - num_dead_beams
-
-    ret["beam_activity"] = float(event.beam_activity) / (num_active_beams)
+    ret["beam_activity"] = event.beam_activity / event.n_live_beams
     if hasattr(event, "dm_activity"):
         ret["coh_dm_activity"] = float(event.dm_activity)
     #if hasattr(event.futures, "incoh_dm_activity"): # don't have this in CHORD L2event!
@@ -210,9 +199,11 @@ def event_to_features(event, event_no=None, return_y=False):
     l1_events = event.l1_events
 
     l1_features = get_l1_features(l1_events)
-    snr_vs_dm_curve = l1_events.snr_vs_dm[np.argmax(l1_events.snr)]
-    snr_vs_dm_metric = get_snr_vs_dm_metric(snr_vs_dm_curve, l1_events.tree_index[np.argmax(l1_events.snr)])
-    l1_features["snr_vs_dm"] = snr_vs_dm_metric
+
+    # We don't currently have a SNR-vs-DM curve...
+    #snr_vs_dm_curve = l1_events.snr_vs_dm[np.argmax(l1_events.snr)]
+    #snr_vs_dm_metric = get_snr_vs_dm_metric(snr_vs_dm_curve, l1_events.tree_index[np.argmax(l1_events.snr)])
+    #l1_features["snr_vs_dm"] = snr_vs_dm_metric
 
     for key in l1_features.dtype.fields:
         ret[key] = l1_features[key]
@@ -253,10 +244,12 @@ def get_l1_features(l1_events):
     ret = np.zeros((1,), dtype=L1_FEATURE_DTYPE)
 
     num_beams = len(l1_events)
-    num_incoherent_beams = np.count_nonzero(l1_events["is_incoherent"])
+    inco = [e.is_incoherent for e in l1_events]
+    num_incoherent_beams = sum(inco)
     num_coherent_beams = num_beams - num_incoherent_beams
 
-    ret["snr"] = np.max(l1_events["snr"])
+    snr = [e.snr for e in l1_events]
+    ret["snr"] = max(snr)
     # penalty on L1b score for high trees
     tree_weight = {
         0: 1,
@@ -268,19 +261,17 @@ def get_l1_features(l1_events):
 
     if num_coherent_beams == 0:  # this is a purely incoherent beam event
         ret["max_coherent_snr"] = 0.0
-        ret["incoherent_snr"] = np.max(l1_events["snr"])
+        ret["incoherent_snr"] = ret["snr"]
         ret["max_to_second_snr_ratio"] = 0.0
-        ret["max_level1_grade"] = np.max(l1_events["rfi_grade_level1"])
-        ret["mean_level1_grade"] = np.mean(l1_events["rfi_grade_level1"])
-        ret["snr_weighted_level1_grade"] = np.average(
-            l1_events["rfi_grade_level1"], weights=l1_events["snr"]
-        )
+        g1 = [e.rfi_grade_level1 for e in l1_events]
+        ret["max_level1_grade"] = max(g1)
+        ret["mean_level1_grade"] = np.mean(g1)
+        ret["snr_weighted_level1_grade"] = np.average(g1, weights=snr)
         ret["std_level1_grade"] = 0
-        ret["min_tree_index"] = np.min(l1_events["tree_index"])
-        ret["mean_tree_index"] = np.mean(l1_events["tree_index"])
-        ret["snr_weighted_tree_index"] = np.average(
-            l1_events["tree_index"], weights=l1_events["snr"]
-        )
+        ti = [e.tree_indexl for e in l1_events]
+        ret["min_tree_index"] = min(ti)
+        ret["mean_tree_index"] = np.mean(ti)
+        ret["snr_weighted_tree_index"] = np.average(ti, weights=snr)
         ret["snr_weighted_tree_index_weighted_level1_grade"] = [ret["snr_weighted_level1_grade"][0]/ tree_weight.get(ret["min_tree_index"][0])]
         ret["std_tree_index"] = 0.0
         ret["ew_extent"] = 0
@@ -292,45 +283,45 @@ def get_l1_features(l1_events):
         # there exist coherent beams.
         # incoherent beam may or may not exist
         if num_incoherent_beams > 0:
-            incoherent_beam_idxs = np.where(l1_events["is_incoherent"])
-            ret["incoherent_snr"] = np.max(l1_events[incoherent_beam_idxs]["snr"])
+            ret["incoherent_snr"] = max([0.] + [e.snr for e in l1_events if e.is_incoherent])
         else:
             ret["incoherent_snr"] = 0.0
 
-        l1_events = l1_events[np.where(l1_events["is_incoherent"] == False)]
+        # Cut to coherent events
+        l1_events = [e for e in l1_events if not(e.is_incoherent)]
 
-        print('rfi_features: l1_events type', type(l1_events))
-        beam_nos = l1_events["beam_no"]
-        snr_sort = np.argsort(l1_events["snr"])
+        snr = [e.snr for e in l1_events]
+        snr_sort = np.argsort(snr)
+        imax = snr_sort[-1]
 
-        ret["max_coherent_snr"] = l1_events["snr"][snr_sort[-1]]
-
+        ret["max_coherent_snr"] = snr[imax]
         if num_coherent_beams > 1:
-            second_max_snr = l1_events["snr"][snr_sort[-2]]
+            isecond = snr_sort[-2]
+            second_max_snr = snr[isecond]
         else:
             second_max_snr = 7.0
         ret["max_to_second_snr_ratio"] = ret["max_coherent_snr"] / second_max_snr
 
-        ret["max_level1_grade"] = np.max(l1_events["rfi_grade_level1"])
-        ret["mean_level1_grade"] = np.mean(l1_events["rfi_grade_level1"])
-        ret["snr_weighted_level1_grade"] = np.average(
-            l1_events["rfi_grade_level1"], weights=l1_events["snr"]
-        )
-        ret["std_level1_grade"] = np.std(l1_events["rfi_grade_level1"])
-        ret["min_tree_index"] = np.min(l1_events["tree_index"])
-        ret["mean_tree_index"] = np.mean(l1_events["tree_index"])
-        ret["snr_weighted_tree_index"] = np.average(
-            l1_events["tree_index"], weights=l1_events["snr"]
-        )
-        ret["std_tree_index"] = np.std(l1_events["tree_index"])
+        g1 = [e.rfi_grade_level1 for e in l1_events]
+        ret["max_level1_grade"] = max(g1)
+        ret["mean_level1_grade"] = np.mean(g1)
+        ret["snr_weighted_level1_grade"] = np.average(g1, weights=snr)
+        ret["std_level1_grade"] = np.std(g1)
+        ti = [e.tree_index for e in l1_events]
+        ret["min_tree_index"] = min(ti)
+        ret["mean_tree_index"] = np.mean(ti)
+        ret["snr_weighted_tree_index"] = np.average(ti, weights=snr)
+        ret["std_tree_index"] = np.std(ti)
         ret["snr_weighted_tree_index_weighted_level1_grade"] = [ret["snr_weighted_level1_grade"][0]/ tree_weight.get(ret["min_tree_index"][0])]
-        ns_beams = beam_nos % 1000
-        ew_beams = beam_nos // 1000
-        ret["ns_extent"] = np.max(ns_beams) - np.min(ns_beams)
-        ret["ew_extent"] = np.max(ew_beams) - np.min(ew_beams)
-        ret["group_density"] = (
-            float(len(l1_events)) / (ret["ns_extent"] + 1) / (ret["ew_extent"] + 1)
-        )
-        ret["max_snr_ns_beam"] = ns_beams[snr_sort[-1]]
+        # CHIME specific
+        #beam_nos = l1_events["beam_no"]
+        #ns_beams = beam_nos % 1000
+        #ew_beams = beam_nos // 1000
+        #ret["ns_extent"] = np.max(ns_beams) - np.min(ns_beams)
+        #ret["ew_extent"] = np.max(ew_beams) - np.min(ew_beams)
+        #ret["group_density"] = (
+        #    float(len(l1_events)) / (ret["ns_extent"] + 1) / (ret["ew_extent"] + 1)
+        #)
+        #ret["max_snr_ns_beam"] = ns_beams[snr_sort[-1]]
 
     return ret

@@ -16,21 +16,13 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from chord_frb_sifter.actors import Actor
-from chord_frb_sifter.event import L1Event, L2Event
+from chord_frb_sifter.event import EventGroup, L1Event, L2Event
 
 __author__ = "CHIME FRB Group"
 __developers__ = "Alex Josephy"
 __email__ = "alexander.josephy@mail.mcgill.ca"
 
-# This incorporates steps that used to be in the EventMaker actor.
 def create_l2_event(l1_events, **kwargs):
-    #print('Creating L2 event from L1 events:')
-    #print("l1_events type:",type(l1_events),type(l1_events[0]))
-    #for e in l1_events:
-    #    print('  ', e)
-    from collections import Counter
-    #print('Beam counts:', Counter([e['beam'] for e in l1_events]))
-    #
     # Keep only the max-SNR event for each beam.
     beam_maxsnr = {}
     for e in l1_events:
@@ -52,17 +44,16 @@ def create_l2_event(l1_events, **kwargs):
             best_snr = snr
             best_event = e
     l1_events = keep
-    # FIXME - this is silly
-    l2_event = L2Event(best_event) # assuming best L1 event is a dictionary
-    for k in ['beam_grid_x', 'beam_grid_y', 'beam_dra', 'beam_ddec', 'snr']:
-        l2_event['max_' + k] = best_event[k]
+    # just initialize the L2 event from the best L1 event...
+    l2_event = L2Event(best_event)
+    for k in ['beam_grid_x', 'beam_grid_y',
+              # vestigal!
+              #'beam_dra', 'beam_ddec',
+              'snr']:
+        l2_event['best_' + k] = best_event[k]
         del l2_event[k]
-    #
     l2_event.update(kwargs)
-    
-    # Now that things are grouped and number of L1 events is fixed, cast as L1Event recarray
-    l2_event['l1_events'] = L1Event(l1_events)
-    #print('l2 event:', l2_event)
+    l2_event.l1_events = l1_events
     return l2_event
 
 class BeamGrouper(Actor):
@@ -125,50 +116,52 @@ class BeamGrouper(Actor):
         self.dm_activity_lookback = deque([0] * 10, maxlen=10)
         self.beam_activity_lookback = deque([0] * 10, maxlen=10)
 
-    def _perform_action(self, events):
+    def __str__(self):
+        return 'BeamGrouper'
+
+    def _perform_action(self, event_group):
         """Pipeline function that groups L1 events.
 
+        The input event_group from the beam_buffer has (L1) events for a
+        single time chunk and all beamsets (pirate search nodes).
+
+        The output event_group has L2 events for a single time chunk.
+        
         Parameters
         ----------
 
         Returns
         -------
         list of ``L2Event``
+
         """
+        events = event_group.events
         print('Beam grouper: %i events' % len(events))
         print('First event:', events[0])
         groups = self._cluster(events)
 
-        dead_beams = [] # Needed for CHIME RFISifter, will probably want for CHORD, but likely won't come from L1 per event.
         beam_activity = len(set([e['beam_id'] for e in events]))
         dm_activity = len(set([e['dm'] for e in events]))
         avg_l1_grade = np.mean([e['rfi_grade_level1'] for e in events])
         self.dm_activity_lookback.append(dm_activity)
         self.beam_activity_lookback.append(beam_activity)
 
-        # tnow = time.monotonic()
-        # for g in groups:
-        #     try:
-        #         tmin = min(g['pipeline_timestamp'])
-        #         pid = g['pipeline_id']
-        #         self.print('BeamGrouper: Elapsed Time for %i: %.3f sec (pipeline timestamp: %s)' %
-        #                    (pid, tnow - tmin, tmin))
-        #     except:
-        #         pass
-
         #"dm_std": coh_events.dm.std(),
         l2_events = []
+        # Do we want to keep them in a single event_group (grouped by chunk)?
+        out_group = EventGroup(chunk_utc = event_group.chunk_utc)
         for group in groups:
             l2_event = create_l2_event(group,
                                        beam_activity=beam_activity,
                                        dm_activity=dm_activity,
-                                       beam_activity_lookback=self.beam_activity_lookback,
-                                       dm_activity_lookback=self.dm_activity_lookback,
+                                       beam_activity_lookback=list(self.beam_activity_lookback),
+                                       dm_activity_lookback=list(self.dm_activity_lookback),
                                        avg_l1_grade=avg_l1_grade,
-                                       dead_beams=dead_beams,
+                                       n_live_beams=event_group.n_live_beams,
                                        )
             l2_events.append(l2_event)
-        return l2_events
+        out_group.events = l2_events
+        return [out_group]
 
     def _cluster(self, events):
         """ Performs event clustering via DBSCAN algorithm """

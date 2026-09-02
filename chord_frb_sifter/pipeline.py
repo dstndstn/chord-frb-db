@@ -13,7 +13,7 @@ def setup():
                 
 # These are our simplified CHORD pipeline actors.
 # A "pipeline" here is just a list of actors.
-def simple_create_pipeline(database_engine):
+def simple_create_pipeline(database_engine, **kwargs):
     # Still reusing some of the config stuff... can probably simplify this too!!
     from frb_common import pipeline_tools
 
@@ -48,31 +48,32 @@ def simple_create_pipeline(database_engine):
         conf.pop('timeout')
         conf.pop('periodic_update')
         conf.update(database_engine=database_engine)
+        conf.update(kwargs)
         p = clz(**conf)
         pipeline.append(p)
     return pipeline
 
 # Fires a list of events through the pipeline.
-def simple_process_events(pipeline, events):
-    input_events = [events]
-    output_events = []
+def simple_process_events(pipeline, event_group):
+    input_groups = [event_group]
+    output_groups = []
 
     # This the famed "It's just a FOR loop" framework
     for actor in pipeline:
-        output_events = []
-        print('Actor', actor, ': feeding %i events' % len(input_events))
-        for in_item in input_events:
-            items = actor.perform_action(in_item)
-            print('Actor', actor, 'in event', in_item, '-> out events', items)
-            if items is None:
+        print('Actor', actor, ': feeding %i groups of events' % len(input_groups))
+        output_groups = []
+        for event_group in input_groups:
+            print('Actor', actor, 'sending input group', event_group)
+            groups = actor.perform_action(event_group)
+            print('Actor', actor, 'input group', event_group, '-> output groups', groups)
+            if groups is None:
                 continue
-            for item in items:
-                if item is None:
+            for group in groups:
+                if group is None:
                     continue
-                output_events.append(item)
-        print('Actor', actor, ': produced %i events' % len(output_events))
-        if len(output_events) == 0:
+                output_groups.append(group)
+        print('Actor', actor, ': produced %i groups' % len(output_groups))
+        if len(output_groups) == 0:
             break
-        input_events = output_events
-    return output_events
-
+        input_groups = output_groups
+    return output_groups
