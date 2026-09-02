@@ -13,16 +13,29 @@ from chord_frb_sifter import config
 
 def simulate_l2_event():
     """Returns a minimal L2Event for smoke-testing pipeline actors."""
-    fake_l1 = np.zeros(3, dtype=get_L1Event_dtype()).view(L1Event)
-    fake_l1['snr'] = [10.0, 8.0, 6.0]
-    fake_l1['dm'] = 100.0
-    fake_l1['tree_index'] = 2
-    fake_l1['beam_id'] = [0, 1, 2]
+
+    snrs = [10.0, 8.0, 6.0]
+    dm = 100.0
+    tree_index = 2
+    beam_ids = [0, 1, 2]
+
     # snr_vs_dm needs nonzero values so RFI feature extraction doesn't get an empty array
-    fake_l1['snr_vs_dm'] = np.array([5.0, 6.0, 7.0, 8.0, 9.0, 9.5, 10.0, 9.5, 9.0,
-                                      8.0, 7.0, 6.0, 5.0, 4.5, 4.0, 3.5, 3.0])
-    return L2Event({'dm': 100.0, 'timestamp_utc': 0.0, 'beam_activity': 10,
-                    'dead_beams': [], 'l1_events': fake_l1})
+    #fake_l1['snr_vs_dm'] = np.array([5.0, 6.0, 7.0, 8.0, 9.0, 9.5, 10.0, 9.5, 9.0,
+    #                                  8.0, 7.0, 6.0, 5.0, 4.5, 4.0, 3.5, 3.0])
+
+    fake_l1 = []
+    for snr,beam_id in zip(snrs, beam_ids):
+        fake_l1.append(L1Event(snr=snr, beam_id=beam_id, dm=dm, tree_index=tree_index,
+                               is_incoherent=False,
+                               rfi_grade_level1=0))
+
+    return L2Event(dm=100.,
+                   timestamp_utc=0,
+                   beam_activite=10,
+                   dead_beams=[],
+                   l1_events=fake_l1,
+                   n_live_beams=10,
+                   beam_activity=3)
 
 class AttribDict(dict):
     __setattr__ = dict.__setitem__
@@ -36,7 +49,7 @@ class AttribDict(dict):
         try:
             return self[name]
         except KeyError:
-            raise AttributeError(name)
+            raise AttributeError('no key %s in class %s' % (name, type(self)))
 
     def __setattr__(self, name, value):
         if name.startswith("_") or name in self._reserved:

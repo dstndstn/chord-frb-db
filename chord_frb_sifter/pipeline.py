@@ -7,8 +7,7 @@ def setup():
 # These are our simplified CHORD pipeline actors.
 # A "pipeline" here is just a list of actors.
 def simple_create_pipeline(database_engine, **kwargs):
-    # Still reusing some of the config stuff... can probably simplify this too!!
-    from frb_common import pipeline_tools
+    from chord_frb_sifter import config
 
     from chord_frb_sifter.actors.beam_buffer import BeamBuffer
     from chord_frb_sifter.actors.beam_grouper import BeamGrouper
@@ -34,12 +33,7 @@ def simple_create_pipeline(database_engine, **kwargs):
                      # ('FluxEstimator', FluxEstimator),
                      ('ActionPicker', ActionPicker),
                      ]:
-        conf = pipeline_tools.get_worker_configuration(name)
-        conf.pop('io')
-        conf.pop('log')
-        picl = conf.pop('use_pickle')
-        conf.pop('timeout')
-        conf.pop('periodic_update')
+        conf = config.get_worker_configuration(name)
         conf.update(database_engine=database_engine)
         conf.update(kwargs)
         p = clz(**conf)
