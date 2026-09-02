@@ -105,13 +105,6 @@ class DMChecker(Actor):
             if all(dm_diff > self.frb_threshold):
                 event.set_frb()
 
-            elif (any(dm_diff <  self.frb_threshold) and
-                  all(dm_diff >= self.ambiguous_threshold)):
-                event.set_ambiguous()
-
-            else:
-                event.set_galactic()
-
             event.dm_gal_ymw_2016_max = dm_ymw16
             event.dm_gal_ne_2025_max = dm_ne2025
 
