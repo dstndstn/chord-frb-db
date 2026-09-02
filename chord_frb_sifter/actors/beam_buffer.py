@@ -13,8 +13,7 @@ from chord_frb_sifter.event import EventGroup
 
 class BeamBuffer(Actor):
     """
-    The purpose of this class is to accumulate events from individual beams
-    into a single frame, such that events may be grouped.
+    This actor groups EventGroups received from all the Pirate search machines for a single time chunk.
     """
     def __init__(self, sifter=None, **kwargs):
         super().__init__(**kwargs)
@@ -30,6 +29,19 @@ class BeamBuffer(Actor):
     def __str__(self):
         return 'BeamBuffer'
 
+    '''
+    This actor receives EventGroups from the Pirate machines (via the
+    gRPC endpoint).  In each time chunk, each pirate node sends a gRPC
+    that becomes an EventGroup, which may have zero or more events in
+    it.
+
+    Once an EventGroup has been received from all the Pirates, a new
+    EventGroup is created for the time chunk and it is sent
+    downstream.
+
+    Each pirate machine handles a set of beams (a "beamset"), which is
+    the terminology used below.
+    '''
     def _perform_action(self, event_group):
         # Assume the event_groups we get are from a single time-chunk and beamset.
 
@@ -107,102 +119,3 @@ class BeamBuffer(Actor):
             break
 
         return rtn
-
-
-    # # First, group events into per-time-chunk, per-beam event groups.  This makes life easier below.
-        # beam_groups = []
-        # current_group = None
-        # for e in events:
-        #     if current_group is not None and e.beam_id != current_group.beam_id:
-        #         beam_groups.append(current_group)
-        #         current_group = None
-        #     if current_group is None:
-        #         current_group = EventGroup(chunk_utc = event_group.chunk_utc,
-        #                                    beamset = event_group.beamset,
-        #                                    beam_id = e.beam_id,
-        #                                    events = [])
-        #     current_group.events.append(e)
-        # if current_group is not None:
-        #     beam_groups.append(current_group)
-
-
-        # rtn = []
-        # def _flush_events():
-        #     if len(self.slowpoke_events):
-        #         print('Flushing', len(self.slowpoke_events), 'slow-pokes')
-        #         rtn.append(self.slowpoke_events)
-        #         self.slowpoke_events = []
-        #     if len(self.buffered_events):
-        #         print('Flushing', len(self.buffered_events), 'events')
-        #         rtn.append(self.buffered_events)
-        #         self.buffered_events = []
-        #     self.expecting_beams = self.current_beams
-        #     self.current_beams = set()
-        #     self.previous_chunk = self.current_chunk
-        # 
-        # def _append_events(lst, evts):
-        #     for e in evts:
-        #         #if not e.get('null_event', False):
-        #         #    lst.append(e)
-        #         lst.append(e)
-        # 
-        # for chunk, beam, events in event_sets:
-        #     if chunk == self.previous_chunk:
-        #         # slowpoke -- at startup, or when replaying from a file, you could get:
-        #         #  chunk 0, beam 1
-        #         #
-        #         #  chunk 1, beam 2
-        #         #  chunk 1, beam 1 --> flush!
-        #         #  chunk 1, beam 3 --> slowpoke!
-        #         #
-        #         #  chunk 2, beam 2
-        #         #  chunk 2, beam 3
-        #         #  chunk 2, beam 1 --> flush!
-        #         #
-        #         #  etc.
-        #         self.expecting_beams.add(beam)
-        #         # FIXME -- append to previous event set?
-        #         print('Got slow-poke event: chunk', chunk, 'current', self.current_chunk,
-        #               'previous', self.previous_chunk, 'beam:', beam)
-        #         if len(rtn):
-        #             print('adding to last batch')
-        #             _append_events(rtn[-1], events)
-        #         else:
-        #             print('adding to slow-pokes')
-        #             _append_events(self.slowpoke_events, events)
-        #         continue
-        # 
-        #     if self.current_chunk is None:
-        #         self.current_chunk = chunk
-        #         print('Starting new batch: chunk', chunk, 'expecting beams:', self.expecting_beams)
-        #         if len(self.slowpoke_events):
-        #             print('Flushing', len(self.slowpoke_events), 'slow-pokes')
-        #             rtn.append(self.slowpoke_events)
-        #             self.slowpoke_events = []
-        # 
-        #     if chunk > self.current_chunk:
-        #         # We got the first event from a new chunk -- flush our current event list!
-        #         print('New chunk - flushing %i events for chunk %s; beams %s' %
-        #               (len(self.buffered_events), self.current_chunk, self.current_beams))
-        #         _flush_events()
-        #         self.current_chunk = chunk
-        # 
-        #     if chunk < self.current_chunk:
-        #         # FIXME -- very slow event... do something??
-        #         print('Ignoring old events: chunk', chunk, 'but current is', self.current_chunk,
-        #               'and previous was', self.previous_chunk, '; events are', events)
-        #         continue
-        # 
-        #     self.current_beams.add(beam)
-        #     _append_events(self.buffered_events, events)
-        # 
-        #     if self.expecting_beams is not None:
-        #         if self.current_beams.issuperset(self.expecting_beams):
-        #             # All expected beams have been received -- flush our current event list!
-        #             print('Got all beams (%s) - expected beams (%s) - flushing %i events for chunk %s' %
-        #                   (self.current_beams, self.expecting_beams, len(self.buffered_events), self.current_chunk))
-        #             _flush_events()
-        #             self.current_chunk = None
-        #             print('Next chunk, will expect beams %s' % self.expecting_beams)
-        # 
-        # return rtn

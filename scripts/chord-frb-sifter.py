@@ -16,10 +16,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from chord_frb_db.models import PirateConfig, BeamSNR
 
-
 '''
 This script opens a gRPC server socket listening for connections from Pirate.
 It loads the pipeline and sends any events it receives through the pipeline.
+It interacts with a database and sends intensity callback requests to Pirate.
 '''
 
 class FrbSifter(frb_sifter_pb2_grpc.FrbSifterServicer):

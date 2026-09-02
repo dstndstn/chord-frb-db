@@ -2,7 +2,11 @@
 Definition of L1 and L2 event classes.
 
 Both L1Event and L2Event are a dictionary with the ability to
-manipulate dictiionary items as class attributes.
+manipulate dictionary items as class attributes.
+
+We also define an EventGroup, which is basically just a wrapper for a
+list of events plus properties that belong to the group.
+
 """
 import numpy as np
 
@@ -25,95 +29,20 @@ class AttribDict(dict):
             raise AttributeError(f"'{name}' is reserved")
         self[name] = value
 
-
 class EventGroup(AttribDict):
     pass
 
-        
-
-# def get_L1Event_dtype():
-# 
-#     # Hardcoded for now to avoid loading CHIME bonsai config.
-#     # Will want to replace with CHORD config loading eventually.
-#     nds = [1, 2, 4, 8, 16]
-#     nbeta = 2
-# 
-#     # The dtype from the saved L1b triggers from fits files:
-#     #dtype([
-#     # ('frame0_nano', '>i8'), 
-#     # ('beam', '>i8'), 
-#     # ('fpga', '>i8'), 
-#     # ('beam_no', '>f8'), 
-#     # ('timestamp_utc', '>f8'), 
-#     # ('timestamp_fpga', '>f8'), 
-#     # ('tree_index', 'u1'), 
-#     # ('snr', '>f4'), 
-#     # ('snr_scale', '>f4'), 
-#     # ('dm', '>f4'), 
-#     # ('spectral_index', 'u1'), 
-#     # ('scattering_measure', 'u1'), 
-#     # ('level1_nhits', '>f8'), 
-#     # ('rfi_grade_level1', 'u1'), 
-#     # ('rfi_mask_fraction', '>f4'), 
-#     # ('rfi_clip_fraction', '>f4'), 
-#     # ('snr_vs_dm', '>f4', (17,)), 
-#     # ('snr_vs_tree_index', '>f4', (5,)), 
-#     # ('snr_vs_spectral_index', '>f4', (2,))]
-# 
-#     # These are fields that Dustin has in the list of dicts l1 events
-#     l1_dtype = np.dtype([
-#         ("id", np.uint64),
-#         ("beam", np.uint16),
-#         ("timestamp_utc", np.float64),
-#         ("timestamp_fpga", np.uint64),
-#         ("frame0_nano", np.uint64),
-#         ("chunk_fpga", np.uint64),
-#         ("chunk_utc", np.float64),
-#         ("tree_index", np.uint8),
-#         ("snr", np.float32),
-#         ("snr_scale", np.float32),
-#         ("dm", np.float32),
-#         ("dm_error", np.float32),
-#         ("spectral_index", np.uint8),
-#         ("scattering_measure", np.uint8),
-#         ("level1_nhits", np.uint16),
-#         ("rfi_grade_level1", np.uint8),
-#         ("rfi_mask_fraction", np.float32),
-#         ("rfi_clip_fraction", np.float32),
-#         ("snr_vs_dm", np.float32, 17),
-#         ("snr_vs_tree_index", np.float32, len(nds)),
-#         ("snr_vs_spectral_index", np.float32, nbeta),
-#         ("beam_grid_x", np.float32),
-#         ("beam_grid_y", np.float32),
-#         ("beam_dra", np.float32),
-#         ("beam_ddec", np.float32),
-#         ("pipeline_timestamp", np.float32),
-#         ("pipeline_id", np.uint64),
-#         ("is_incoherent", bool),
-#     ])
-# 
-#     return l1_dtype
-
 class L1Event(AttribDict):
-    # """
-    # A class representing an L1 event, inheriting from numpy recarray.
-    # """
-    # def __new__(cls, input_array):
-    # 
-    #     # hack for list of dicts (not sure if we want to support long-term though).
-    #     if isinstance(input_array, list) and isinstance(input_array[0], dict):
-    #         array = np.zeros(len(input_array),dtype=get_L1Event_dtype())
-    #         for k in input_array[0].keys():
-    #             array[k] = [item[k] for item in input_array]
-    # 
-    #     else:
-    #         # Casts the input as a numpy recarray with the L1Event dtype
-    #         # May want to add other ways to create?
-    #         array = np.asarray(input_array,dtype=get_L1Event_dtype())
-    #     return array.view(cls)
 
+    '''
+    Creates a dict to initialize a database object,
+    chord_frb_db.models.EventBeam
+
+    ... which is basically just this L1Event dict with same keys
+    renamed and some values normalized
+    '''
     def database_payload(self):
-        # my name -> db name
+        # my name -> db name (or True if the name is the same)
         l1_name_map = {
             'id': True,
             'beam_id': 'beam',
@@ -135,9 +64,6 @@ class L1Event(AttribDict):
 
         db_args = {}
         for key,val in self.items():
-            #if key == 'timestamp_utc':
-            #    # microsec -> sec
-            #    val *= 1e-6
             val = to_db_type(val)
             k2 = l1_name_map.get(key, None)
             if k2 is not None:
@@ -173,9 +99,12 @@ class L2Event(AttribDict):
     def set_galactic(self):
         self.flag_galactic = True
 
+    '''
+    Creates a dict to initialize a database object,
+        chord_frb_db.models.Event
+    '''
     def database_payload(self):
         # dict shallow copy
-        #payload = self.copy()
         l2_db_args = { 'is_rfi': self.is_rfi(),
                        'is_known_pulsar': False,
                        'is_new_burst': False,
@@ -188,6 +117,7 @@ class L2Event(AttribDict):
             'event_id': True,
             'timestamp_utc': 'timestamp',
             'combined_snr': 'total_snr',
+            'best_snr': True,
             'dm': True,
             'dm_error': True,
             'ra': True,
@@ -238,11 +168,8 @@ class L2Event(AttribDict):
                 l2_db_args[k2] = v
             else:
                 pass
-                #print('Ignoring L2 key:', k, '=', v)
-
         l2_db_args['nbeams'] = n_l1
         return l2_db_args
-
 
 def to_db_type(v):
     # convert to normal python types for database interaction

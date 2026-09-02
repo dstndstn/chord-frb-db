@@ -294,8 +294,6 @@ def intensity_file_view(event_id, filename):
             resp = make_response(plotdata)
             resp.headers['Content-Type'] = 'image/png'
             return resp
-    #return str(af.info())
-    #return str(path)
 
 @app.route('/')
 def event_list(): #(name=None):
